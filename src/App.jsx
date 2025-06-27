@@ -69,18 +69,26 @@ export default function App() {
 
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-    // --- EFECTO DE INICIALIZACIÓN DE FIREBASE ---
+    // --- EFECTO DE INICIALIZACIÓN DE FIREBASE (CORREGIDO) ---
     useEffect(() => {
         let firebaseConfig;
         try {
-            // La única fuente de configuración en este entorno es la variable global.
-            const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-            
-            console.log("DIAGNÓSTICO FIREBASE:", rawConfig); // Muestra lo que se recibió
+            // Lee la configuración de la fuente correcta dependiendo del entorno
+            let rawConfig = null;
+            if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_CONFIG) {
+                // Para entornos de despliegue como Vercel
+                rawConfig = import.meta.env.VITE_FIREBASE_CONFIG;
+                console.log("DIAGNÓSTICO: Configuración encontrada en VITE_FIREBASE_CONFIG.");
+            } else if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                // Para el entorno de Canvas
+                rawConfig = __firebase_config;
+                console.log("DIAGNÓSTICO: Configuración encontrada en __firebase_config.");
+            }
             
             if (!rawConfig) {
-                throw new Error("Variable de configuración __firebase_config no encontrada.");
+                throw new Error("Variable de configuración de Firebase no encontrada.");
             }
+
             firebaseConfig = JSON.parse(rawConfig);
 
             const app = initializeApp(firebaseConfig);
