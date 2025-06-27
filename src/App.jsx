@@ -1,28 +1,29 @@
-// Importaciones de React y librerías necesarias
 import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-    getAuth, 
-    onAuthStateChanged, 
-    signInAnonymously, 
-    signInWithCustomToken 
+import { app, firebaseConfig } from './firebase';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInAnonymously,
+  signInWithCustomToken
 } from 'firebase/auth';
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    onSnapshot, 
-    query,
-    Timestamp,
-    setLogLevel
+import {
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  Timestamp
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
-const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
+import { app, firebaseConfig } from './firebase';
+
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // --- COMPONENTES DE LA UI ---
 
@@ -213,7 +214,7 @@ export default function App() {
     
     useEffect(() => {
         if (!db || !userId) return;
-        const itemsCollectionPath = `artifacts/${appId}/users/${userId}/equipos`;
+        const itemsCollectionPath = `artifacts/${firebaseConfig.appId}/users/${userId}/equipos`;
         const q = query(collection(db, itemsCollectionPath));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -225,7 +226,7 @@ export default function App() {
 
     const handleSaveItem = async (itemData) => {
         if (!db || !userId) return;
-        const itemsCollectionPath = `artifacts/${appId}/users/${userId}/equipos`;
+        const itemsCollectionPath = `artifacts/${firebaseConfig.appId}/users/${userId}/equipos`;
         try {
             if (itemData.id) {
                 const itemRef = doc(db, itemsCollectionPath, itemData.id);
