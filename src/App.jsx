@@ -221,7 +221,7 @@ export default function App() {
                     }
                 } catch(e) {
                     console.error("Error fetching user role:", e);
-                    setUser({ ...firebaseUser, role: 'Lector' }); // Asigna rol por defecto si hay error en la DB
+                    setUser({ ...firebaseUser, role: 'Lector' }); 
                 }
             } else {
                 setUser(null);
@@ -234,10 +234,6 @@ export default function App() {
 
     const handleLogin = async (email, password) => {
         if (!auth) throw new Error("La autenticación de Firebase no está lista.");
-        // Primero, cierra la sesión anónima si existe
-        if (auth.currentUser && auth.currentUser.isAnonymous) {
-            await signOut(auth);
-        }
         return signInWithEmailAndPassword(auth, email, password);
     };
 
