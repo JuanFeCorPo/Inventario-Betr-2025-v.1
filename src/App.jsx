@@ -187,7 +187,7 @@ export default function App() {
 
     useEffect(() => {
         try {
-            const app = initializeApp(firebaseConfig);
+            
             const authInstance = getAuth(app);
             const dbInstance = getFirestore(app);
             setDb(dbInstance);
