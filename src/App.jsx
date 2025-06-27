@@ -178,10 +178,12 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [auth, setAuth] = useState(null);
     const [db, setDb] = useState(null);
+    const [configError, setConfigError] = useState(false);
 
     useEffect(() => {
         if (!firebaseConfig) {
             console.error("Configuración de Firebase no encontrada.");
+            setConfigError(true);
             setLoading(false);
             return;
         }
@@ -189,7 +191,11 @@ export default function App() {
             const app = initializeApp(firebaseConfig);
             setAuth(getAuth(app));
             setDb(getFirestore(app));
-        } catch(e) { console.error("Error inicializando Firebase", e); }
+        } catch(e) {
+            console.error("Error inicializando Firebase:", e);
+            setConfigError(true);
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -231,6 +237,10 @@ export default function App() {
         return <div className="bg-gray-900 h-screen flex justify-center items-center text-white text-xl">Cargando...</div>;
     }
 
+    if (configError) {
+        return <ConfigErrorScreen />;
+    }
+
     return (
         <>
             {user ? (
@@ -248,4 +258,3 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => { const [ite
 const HistoryModal = ({ isOpen, onClose, item }) => { return ( <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}><div className="space-y-4 text-gray-300"><p><span className="font-semibold text-gray-100">Observaciones Generales:</span> {item?.observaciones || 'Ninguna.'}</p>{item?.estado === 'De Baja' && ( <div className="bg-yellow-900/50 p-4 rounded-lg border border-yellow-700"><h4 className="font-bold text-yellow-300">Información de Baja</h4><p><span className="font-semibold">Fecha:</span> {item.fecha_baja?.toDate().toLocaleString()}</p><p><span className="font-semibold">Motivo:</span> {item.motivo_baja || 'No especificado.'}</p></div> )}<p className="italic text-sm text-center pt-4">La función de historial de asignaciones se implementará en una futura versión.</p></div></Modal> ); };
 const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => { const [reason, setReason] = useState(''); const handleConfirm = () => { if (!reason) { alert("Por favor, especifica un motivo para la baja."); return; } onDeactivate(reason); }; return ( <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo"><div className="space-y-4"><p>Por favor, especifica el motivo para dar de baja este equipo.</p><textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: Pantalla rota, equipo obsoleto..." className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-28" required/><div className="flex justify-end space-x-4 pt-2"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button onClick={handleConfirm} className="px-6 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 font-semibold transition-colors">Confirmar Baja</button></div></div></Modal> ); };
 const UserManagement = ({ db, auth, onBack }) => { return ( <div className="animate-modal-in"> <header className="flex justify-between items-center mb-8"><div><h1 className="text-3xl font-bold text-white">Administración de Usuarios</h1><p className="text-gray-400">Esta sección es una simulación visual.</p></div></header> <div className="bg-gray-800 p-6 rounded-xl text-center text-gray-300"> <p>La gestión de usuarios real se implementará con Cloud Functions por seguridad.</p> <button onClick={onBack} className="mt-8 px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Volver al Inventario</button> </div> </div> ); }
-
