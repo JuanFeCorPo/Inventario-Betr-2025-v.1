@@ -120,22 +120,61 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
-        if (db && user?.uid) {
-            const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`;
-            const q = query(collection(db, itemsCollectionPath));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                itemsData.sort((a, b) => (b.fechaIngreso?.toDate() || 0) - (a.fechaIngreso?.toDate() || 0));
-                setItems(itemsData);
-            }, (error) => console.error("DASHBOARD_ERROR: No se pudieron obtener los datos de Firestore.", error));
-            return () => unsubscribe();
-        }
+        if (!db || !user?.uid) return;
+        
+        // CORRECCIÓN: Apunta a la colección privada del usuario, no a la pública.
+        const itemsCollectionPath = `artifacts/${appId}/users/${user.uid}/equipos`;
+        const q = query(collection(db, itemsCollectionPath));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            itemsData.sort((a, b) => (b.fechaIngreso?.toDate() || 0) - (a.fechaIngreso?.toDate() || 0));
+            setItems(itemsData);
+        }, (error) => console.error("DASHBOARD_ERROR: No se pudieron obtener los datos de Firestore.", error));
+        
+        return () => unsubscribe();
     }, [user, db]);
-    const handleSaveItem = async (itemData) => { if (!db) return; const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`; try { if (itemData.id) { const itemRef = doc(db, itemsCollectionPath, itemData.id); const { id, ...dataToUpdate } = itemData; await updateDoc(itemRef, dataToUpdate); } else { await addDoc(collection(db, itemsCollectionPath), { ...itemData, fecha_salida: null, fecha_baja: null }); } setShowModal(false); setCurrentItem(null); } catch (error) { console.error("CRUD_ERROR: Falla al guardar equipo.", error); } };
+
+    const handleSaveItem = async (itemData) => {
+        if (!db || !user?.uid) return;
+        const itemsCollectionPath = `artifacts/${appId}/users/${user.uid}/equipos`;
+        try {
+            if (itemData.id) {
+                const itemRef = doc(db, itemsCollectionPath, itemData.id);
+                const { id, ...dataToUpdate } = itemData;
+                await updateDoc(itemRef, dataToUpdate);
+            } else {
+                await addDoc(collection(db, itemsCollectionPath), { ...itemData, fecha_salida: null, fecha_baja: null });
+            }
+            setShowModal(false);
+            setCurrentItem(null);
+        } catch (error) {
+            console.error("CRUD_ERROR: Falla al guardar equipo.", error);
+        }
+    };
+
+    const executeConfirmAction = async () => {
+        const { action, item } = confirmAction;
+        if (!item || !db || !user?.uid) return;
+        const itemRef = doc(db, `artifacts/${appId}/users/${user.uid}/equipos`, item.id);
+        try {
+            if (action === 'soft-delete') {
+                await updateDoc(itemRef, { estado: 'De Baja', fecha_baja: Timestamp.now() });
+            } else if (action === 'hard-delete') {
+                await deleteDoc(itemRef);
+            }
+        } catch (error) {
+            console.error(`CRUD_ERROR: Falla en la acción ${action}.`, error);
+        } finally {
+            setShowConfirm(false);
+            setConfirmAction({ action: null, item: null });
+        }
+    };
+    
     const openAddItemModal = () => { setCurrentItem(null); setShowModal(true); };
     const openEditItemModal = (item) => { setCurrentItem(item); setShowModal(true); };
     const openConfirmDialog = (action, item) => { setConfirmAction({ action, item }); setShowConfirm(true); };
-    const executeConfirmAction = async () => { const { action, item } = confirmAction; if (!item || !db) return; const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, item.id); try { if (action === 'soft-delete') await updateDoc(itemRef, { estado: 'De Baja', fecha_baja: Timestamp.now() }); else if (action === 'hard-delete') await deleteDoc(itemRef); } catch (error) { console.error(`CRUD_ERROR: Falla en la acción ${action}.`, error); } finally { setShowConfirm(false); setConfirmAction({ action: null, item: null }); } };
+
     const filteredItems = useMemo(() => items.filter(item => { const catMatch = filterCategory === 'Todos' || item.categoria === filterCategory; const statusMatch = (filterStatus === 'Activos' && item.estado !== 'De Baja') || (filterStatus === 'De Baja' && item.estado === 'De Baja') || filterStatus === 'Todos'; const searchMatch = searchTerm === '' || (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase())); return catMatch && statusMatch && searchMatch; }), [items, filterCategory, filterStatus, searchTerm]);
     const stats = useMemo(() => { const activos = items.filter(item => item.estado !== 'De Baja'); return { total: activos.length, disponibles: activos.filter(item => item.estado === 'Disponible').length, enUso: activos.filter(item => item.estado === 'En Uso').length, deBaja: items.filter(item => item.estado === 'De Baja').length }; }, [items]);
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
@@ -199,8 +238,6 @@ export default function App() {
     // Escucha los cambios de estado de autenticación
     useEffect(() => {
         if (!auth || !db) {
-            // Si la inicialización de Firebase aún no ha terminado, no hagas nada.
-            // Si falló (auth es null), loading se establecerá en false por el primer useEffect.
             if (!loading && !auth) {
                  setLoading(false);
             }
@@ -215,7 +252,6 @@ export default function App() {
                     if (userDoc.exists()) {
                         setUser({ ...firebaseUser, role: userDoc.data().role || 'Lector' });
                     } else {
-                        // Usuario autenticado pero sin documento de rol en Firestore
                         console.warn(`No se encontró un documento de rol para el usuario ${firebaseUser.uid}. Asignando rol de 'Lector'.`);
                         setUser({ ...firebaseUser, role: 'Lector' });
                     }
