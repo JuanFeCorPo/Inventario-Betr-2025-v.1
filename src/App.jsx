@@ -36,8 +36,17 @@ const ConfigErrorScreen = () => (
             <Frown className="mx-auto text-red-500 mb-6" size={64} strokeWidth={1.5}/>
             <h1 className="text-4xl font-bold text-white mb-3">Error de Configuración</h1>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-                No se encontraron las credenciales de Firebase. La aplicación no puede continuar.
+                No se encontraron las credenciales de Firebase.
             </p>
+        </div>
+        <div className="bg-gray-800 p-6 rounded-2xl text-left w-full max-w-3xl mt-10 shadow-2xl border border-gray-700">
+            <h2 className="text-xl font-semibold mb-4 text-white">¿Cómo solucionarlo?</h2>
+            <ol className="list-decimal list-inside text-gray-300 space-y-3">
+                <li>Ve a tu proyecto en Vercel {' > '} <code className="bg-gray-700 p-1 rounded">Settings</code> {' > '} <code className="bg-gray-700 p-1 rounded">Environment Variables</code>.</li>
+                <li>Verifica que exista una variable con la Key (nombre) exacta: <code className="bg-gray-700 p-1 rounded">VITE_FIREBASE_CONFIG</code>.</li>
+                <li>Asegúrate de que el Value (valor) sea el objeto de configuración JSON completo (el texto que empieza con {'{'} y termina con {'}'}).</li>
+                <li>Después de guardar, ve a la pestaña <code className="bg-gray-700 p-1 rounded">Deployments</code> y haz **"Redeploy"** en el último despliegue para aplicar los cambios.</li>
+            </ol>
         </div>
     </div>
 );
@@ -188,7 +197,7 @@ export default function App() {
         };
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
+            if (firebaseUser && !firebaseUser.isAnonymous) {
                 const userDocRef = doc(db, "users", firebaseUser.uid);
                 try {
                     const userDoc = await getDoc(userDocRef);
@@ -207,6 +216,14 @@ export default function App() {
             }
             setLoading(false);
         });
+
+        // Inicia sesión anónimamente si no hay usuario al principio
+        if (!auth.currentUser) {
+            signInAnonymously(auth).catch(err => {
+                console.error("Fallo el inicio de sesión anónimo", err);
+                setLoading(false);
+            })
+        }
 
         return () => unsubscribe();
     }, [auth, db, loading]);
