@@ -91,7 +91,7 @@ const LoginScreen = ({ onLogin }) => {
     return (
         <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white p-4">
             <div className="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl animate-modal-in">
-                <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario</h1>
+                <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario Betrmedia SAS</h1>
                 <p className="text-center text-gray-400 mb-8">Inicia sesión para continuar</p>
                 <form onSubmit={handleLogin} className="space-y-6">
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required />
