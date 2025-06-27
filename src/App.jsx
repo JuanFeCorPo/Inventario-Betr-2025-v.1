@@ -20,31 +20,24 @@ import {
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, Frown } from 'lucide-react';
 
-// --- Componente para mostrar errores de configuración ---
+// --- Componente para mostrar errores de configuración (con diagnóstico) ---
 const ConfigErrorScreen = () => (
     <div className="bg-gray-900 h-screen flex flex-col justify-center items-center text-white p-8 animate-modal-in">
         <div className="text-center">
             <Frown className="mx-auto text-red-500 mb-6" size={64} strokeWidth={1.5}/>
             <h1 className="text-4xl font-bold text-white mb-3">Error de Configuración</h1>
             <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-                La aplicación no pudo conectarse a la base de datos porque no encontró las credenciales de Firebase.
+                La aplicación no pudo encontrar las credenciales de Firebase. Estamos a un paso de solucionarlo.
             </p>
         </div>
         <div className="bg-gray-800 p-6 rounded-2xl text-left w-full max-w-3xl mt-10 shadow-2xl border border-gray-700">
-            <h2 className="text-xl font-semibold mb-4 text-white">¿Cómo solucionarlo?</h2>
+            <h2 className="text-xl font-semibold mb-4 text-white">Paso de Diagnóstico Final</h2>
             <ol className="list-decimal list-inside text-gray-300 space-y-3">
-                <li>
-                    Ve a tu proyecto en Vercel, luego a <code className="bg-gray-700 px-2 py-1 rounded-md text-orange-400">Settings</code> {'>'} <code className="bg-gray-700 px-2 py-1 rounded-md text-orange-400">Environment Variables</code>.
-                </li>
-                <li>
-                    Asegúrate de que existe una variable con la "Key" (nombre) exacta: <code className="bg-gray-700 px-2 py-1 rounded-md text-orange-400">VITE_FIREBASE_CONFIG</code>.
-                </li>
-                <li>
-                    Verifica que el "Value" (valor) de esa variable sea el objeto de configuración de Firebase (el texto que empieza con <code className="text-gray-400">{'{'}</code> y termina con <code className="text-gray-400">{'}'}</code>).
-                </li>
-                <li>
-                    Después de guardar la variable, ve a la pestaña <code className="bg-gray-700 px-2 py-1 rounded-md text-orange-400">Deployments</code> y haz clic en **"Redeploy"** en el último despliegue para aplicar los cambios.
-                </li>
+                <li>Abre esta página en tu navegador (la que estás viendo ahora).</li>
+                <li>Haz clic derecho en cualquier parte y selecciona **"Inspeccionar"**.</li>
+                <li>En la ventana que se abre, ve a la pestaña **"Consola"**.</li>
+                <li>Busca una línea que empieza con: <code className="bg-gray-700 px-2 py-1 rounded-md text-orange-400">DIAGNÓSTICO FIREBASE:</code></li>
+                <li>**Dime exactamente qué aparece después de ese texto.** La respuesta será "undefined" o el texto de tu configuración. Con esa información, resolveremos el problema.</li>
             </ol>
         </div>
     </div>
@@ -74,21 +67,21 @@ export default function App() {
     const [filterStatus, setFilterStatus] = useState('Activos');
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- CORRECCIÓN: Declarar appId a nivel del componente ---
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     // --- EFECTO DE INICIALIZACIÓN DE FIREBASE ---
     useEffect(() => {
         let firebaseConfig;
         try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                firebaseConfig = JSON.parse(__firebase_config);
-            } else if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_FIREBASE_CONFIG) {
-                firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
+            // La única fuente de configuración en este entorno es la variable global.
+            const rawConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            
+            console.log("DIAGNÓSTICO FIREBASE:", rawConfig); // Muestra lo que se recibió
+            
+            if (!rawConfig) {
+                throw new Error("Variable de configuración __firebase_config no encontrada.");
             }
-            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                throw new Error("La configuración de Firebase está ausente o vacía.");
-            }
+            firebaseConfig = JSON.parse(rawConfig);
 
             const app = initializeApp(firebaseConfig);
             const authInstance = getAuth(app);
@@ -112,7 +105,7 @@ export default function App() {
                     try {
                         await signInWithCustomToken(authInstance, token);
                     } catch (e) {
-                        console.warn(`El token personalizado no fue válido (${e.code}), se usará una sesión anónima.`);
+                        console.warn(`Token no válido (${e.code}), usando sesión anónima.`);
                         await signInAnonymously(authInstance);
                     }
                 } else {
@@ -145,7 +138,7 @@ export default function App() {
             setItems(itemsData); 
         }, (error) => console.error("Error al obtener datos:", error)); 
         return () => unsubscribe(); 
-    }, [db, userId, appId]); // appId añadido como dependencia
+    }, [db, userId, appId]);
 
     // --- LÓGICA DE LA APP ---
     const handleSaveItem = async (itemData) => { 
