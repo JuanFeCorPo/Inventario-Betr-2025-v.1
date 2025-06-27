@@ -23,6 +23,7 @@ import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archi
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
+
 // --- COMPONENTES DE LA UI ---
 
 const StatCard = ({ title, value, icon, color }) => (
