@@ -56,7 +56,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 // --- MODALES ESPECÍFICOS ---
 const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => {
     const [item, setItem] = useState({});
-    const categorias = ["Periféricos", "Monitores", "Laptops", "CPU", "Cámaras", "Luces", "Audio", "Otros"];
+    const categorias = ["Periféricos", "Monitores", "Laptops", "CPU", "Cámaras", "Luces", "Audio", "Electrodomésticos", "Otros"];
 
     useEffect(() => {
         if (isOpen) {
@@ -133,7 +133,7 @@ const HistoryModal = ({ isOpen, onClose, item }) => {
                         <p><span className="font-semibold">Motivo:</span> {item.motivo_baja || 'No especificado.'}</p>
                     </div>
                 )}
-                 <p className="italic text-sm text-center pt-4">La función de historial de asignaciones se implementará en una futura versión.</p>
+                 <p className="italic text-sm text-center pt-4">La función de historial se muestra cuando el equipo ha sido dado de baja.</p>
             </div>
         </Modal>
     );
@@ -161,7 +161,7 @@ const LoginScreen = ({ onLogin }) => {
     return (
          <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white p-4">
             <div className="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl animate-modal-in">
-                <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario</h1>
+                <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario Betrmedia SAS</h1>
                 <p className="text-center text-gray-400 mb-8">Inicia sesión para continuar</p>
                 <form onSubmit={handleLogin} className="space-y-6">
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo electrónico" className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required />
@@ -244,7 +244,7 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
         <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
                  <header className="flex flex-wrap gap-4 justify-between items-center mb-8">
-                    <div><h1 className="text-3xl font-bold text-white">Sistema de Inventario</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div>
+                    <div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div>
                     <div className="flex items-center gap-4">{user.role === 'Administrador' && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div>
                  </header>
 
