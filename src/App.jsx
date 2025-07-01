@@ -17,7 +17,8 @@ import {
     deleteDoc, 
     onSnapshot, 
     query,
-    Timestamp
+    Timestamp,
+    arrayUnion // Importante para el historial
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
@@ -122,18 +123,50 @@ const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
 };
 
 const HistoryModal = ({ isOpen, onClose, item }) => {
+    const sortedHistory = useMemo(() => {
+        if (!item?.history) return [];
+        return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+    }, [item]);
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}>
-            <div className="space-y-4 text-gray-300">
-                <p><span className="font-semibold text-gray-100">Observaciones Generales:</span> {item?.observaciones || 'Ninguna.'}</p>
-                {item?.estado === 'De Baja' && (
-                    <div className="bg-yellow-900/50 p-4 rounded-lg border border-yellow-700">
-                        <h4 className="font-bold text-yellow-300">Información de Baja</h4>
-                        <p><span className="font-semibold">Fecha:</span> {item.fecha_baja?.toDate().toLocaleString()}</p>
-                        <p><span className="font-semibold">Motivo:</span> {item.motivo_baja || 'No especificado.'}</p>
-                    </div>
+            <div className="space-y-4 text-gray-300 max-h-[60vh] overflow-y-auto">
+                {sortedHistory.length > 0 ? (
+                    sortedHistory.map((entry, index) => (
+                        <div key={index} className="bg-gray-700/50 p-4 rounded-lg">
+                            <p className="font-semibold text-gray-100">{entry.action}</p>
+                            {entry.changes && entry.changes.length > 0 && (
+                                <ul className="list-disc list-inside mt-2 text-sm">
+                                    {entry.changes.map((change, i) => (
+                                        <li key={i}>
+                                            <span className="capitalize font-medium">{change.field}:</span> de <span className="text-red-400">'{change.from}'</span> a <span className="text-green-400">'{change.to}'</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <p className="text-xs text-gray-400 mt-2 text-right">
+                                {entry.timestamp?.toDate().toLocaleString()} por <span className="font-medium text-orange-400">{entry.user}</span>
+                            </p>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-center italic">No hay historial de modificaciones para este equipo.</p>
                 )}
-                 <p className="italic text-sm text-center pt-4">La función de historial de asignaciones se implementará en una futura versión.</p>
+            </div>
+        </Modal>
+    );
+};
+
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Eliminar ${itemName || 'Equipo'}`}>
+            <div className="space-y-4">
+                <p className="text-lg text-red-300">¡Advertencia! Esta acción es irreversible.</p>
+                <p>¿Estás seguro de que quieres eliminar permanentemente <span className="font-bold text-white">{itemName}</span> de la base de datos?</p>
+                <div className="flex justify-end space-x-4 pt-2">
+                    <button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button>
+                    <button onClick={onConfirm} className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500 font-semibold transition-colors">Sí, Eliminar</button>
+                </div>
             </div>
         </Modal>
     );
@@ -205,14 +238,44 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     }, [db]);
     
     const handleSaveItem = async (itemData) => {
-        if (!isAdmin) return; 
+        if (!isAdmin) return;
         const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`;
         const { id, ...dataToSave } = itemData;
+
         try {
             if (id) {
-                await updateDoc(doc(db, itemsCollectionPath, id), dataToSave);
+                const itemRef = doc(db, itemsCollectionPath, id);
+                const docSnap = await getDoc(itemRef);
+                const oldData = docSnap.data();
+                
+                let changes = [];
+                for (const key in dataToSave) {
+                    if (dataToSave[key] !== oldData[key]) {
+                        if (dataToSave[key] instanceof Timestamp && oldData[key] instanceof Timestamp) {
+                            if (!dataToSave[key].isEqual(oldData[key])) {
+                                changes.push({ field: key, from: oldData[key].toDate().toLocaleDateString(), to: dataToSave[key].toDate().toLocaleDateString() });
+                            }
+                        } else if (key !== 'history') {
+                            changes.push({ field: key, from: oldData[key] || "", to: dataToSave[key] || "" });
+                        }
+                    }
+                }
+                
+                const historyEntry = {
+                    timestamp: Timestamp.now(),
+                    user: user.email,
+                    action: 'Equipo modificado.',
+                    changes: changes
+                };
+                await updateDoc(itemRef, { ...dataToSave, history: arrayUnion(historyEntry) });
+
             } else {
-                await addDoc(collection(db, itemsCollectionPath), { ...dataToSave, addedBy: user.uid, createdAt: Timestamp.now() });
+                 const historyEntry = {
+                    timestamp: Timestamp.now(),
+                    user: user.email,
+                    action: 'Equipo creado en el inventario.'
+                };
+                await addDoc(collection(db, itemsCollectionPath), { ...dataToSave, addedBy: user.uid, createdAt: Timestamp.now(), history: [historyEntry] });
             }
             setModal({ type: null, data: null });
         } catch (error) { console.error("Error guardando equipo:", error); }
@@ -221,26 +284,59 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     const handleDeactivateItem = async (reason) => {
         if (!isAdmin || !modal.data?.id) return;
         const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id);
+        
+        const historyEntry = {
+            timestamp: Timestamp.now(),
+            user: user.email,
+            action: `Equipo dado de baja: ${reason}`
+        };
+
         await updateDoc(itemRef, { 
             estado: 'De Baja', 
             fecha_baja: Timestamp.now(),
-            motivo_baja: reason
+            motivo_baja: reason,
+            history: arrayUnion(historyEntry)
         });
         setModal({ type: null, data: null });
     };
 
-    const handleDeleteItem = async (itemId) => {
-        if (!isAdmin || !itemId) return;
-        if (window.confirm("¿Estás seguro de que quieres eliminar este equipo permanentemente? Esta acción es irreversible.")) {
-            await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, itemId));
+    const handleDeleteItem = async () => {
+        if (!isAdmin || !modal.data?.id) return;
+        await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id));
+        setModal({ type: null, data: null });
+    };
+
+    const handleStatCardClick = (status) => {
+        if (status === 'Activos') {
+            setFilterStatus('Activos');
+        } else {
+            setFilterStatus(status);
         }
     };
 
-    const filteredItems = useMemo(() => items.filter(item => { const catMatch = filterCategory === 'Todos' || item.categoria === filterCategory; const statusMatch = (filterStatus === 'Activos' && item.estado !== 'De Baja') || (filterStatus === 'De Baja' && item.estado === 'De Baja') || filterStatus === 'Todos'; const searchMatch = searchTerm === '' || (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase())); return catMatch && statusMatch && searchMatch; }), [items, filterCategory, filterStatus, searchTerm]);
+    const filteredItems = useMemo(() => {
+        return items.filter(item => {
+            const categoryMatch = filterCategory === 'Todos' || item.categoria === filterCategory;
+            let statusMatch = false;
+            if (filterStatus === 'Todos') {
+                statusMatch = true;
+            } else if (filterStatus === 'Activos') {
+                statusMatch = item.estado !== 'De Baja';
+            } else {
+                statusMatch = item.estado === filterStatus;
+            }
+            const searchMatch = searchTerm === '' || 
+                                (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || 
+                                (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || 
+                                (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase()));
+            return categoryMatch && statusMatch && searchMatch;
+        });
+    }, [items, filterCategory, filterStatus, searchTerm]);
+
     const stats = useMemo(() => { const activos = items.filter(item => item.estado !== 'De Baja'); return { total: activos.length, disponibles: activos.filter(item => item.estado === 'Disponible').length, enUso: activos.filter(item => item.estado === 'En Uso').length, deBaja: items.filter(item => item.estado === 'De Baja').length }; }, [items]);
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
     const getStatusBadge = (status) => { const statuses = { 'Disponible': "bg-green-600 text-green-100", 'En Uso': "bg-yellow-600 text-yellow-100", 'En Mantenimiento': "bg-purple-600 text-purple-100", 'De Baja': "bg-gray-500 text-gray-100" }; return <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statuses[status] || 'bg-gray-400'}`}>{status}</span>; };
-    const StatCard = ({ title, value, icon, color }) => ( <div className="bg-gray-800 p-6 rounded-2xl shadow-lg flex items-center space-x-4 transition-transform duration-300 hover:scale-105"><div className={`p-3 rounded-full ${color}`}>{icon}</div><div><p className="text-gray-400 text-sm font-medium">{title}</p><p className="text-white text-3xl font-bold">{value}</p></div></div> );
+    const StatCard = ({ title, value, icon, color, onClick }) => ( <button onClick={onClick} className={`w-full text-left bg-gray-800 p-6 rounded-2xl shadow-lg flex items-center space-x-4 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 ${color.replace('bg-', 'focus:ring-')}`}><div className={`p-3 rounded-full ${color}`}>{icon}</div><div><p className="text-gray-400 text-sm font-medium">{title}</p><p className="text-white text-3xl font-bold">{value}</p></div></button> );
     const UserManagement = ({ onBack }) => { return ( <div className="animate-modal-in"><header className="flex justify-between items-center mb-8"><div><h1 className="text-3xl font-bold text-white">Administración de Usuarios</h1><p className="text-gray-400">Esta sección es una simulación visual.</p></div></header><div className="bg-gray-800 p-6 rounded-xl text-center text-gray-300"><p>La gestión de usuarios real se implementará con Cloud Functions por seguridad.</p><button onClick={onBack} className="mt-8 px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Volver al Inventario</button></div></div> ); };
     
     return (
@@ -253,12 +349,17 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
 
                 {view === 'inventory' ? (
                     <div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" /></div>
-                        <div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} />
+                            <StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} />
+                            <StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} />
+                            <StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} />
+                        </div>
+                        <div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div>
                         <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead>
-                                <tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => handleDeleteItem(item.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody>
+                                <tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody>
                             </table>
                         </div>
                     </div>
@@ -270,6 +371,7 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
             <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={() => setModal({ type: null, data: null })} onSave={handleSaveItem} currentItem={modal.data} />
             <HistoryModal isOpen={modal.type === 'history'} onClose={() => setModal({ type: null, data: null })} item={modal.data} />
             <DeactivateModal isOpen={modal.type === 'deactivate'} onClose={() => setModal({ type: null, data: null })} onDeactivate={handleDeactivateItem} />
+            <DeleteConfirmModal isOpen={modal.type === 'delete'} onClose={() => setModal({ type: null, data: null })} onConfirm={handleDeleteItem} itemName={modal.data?.nombre} />
             
             <style>{`.animate-modal-in { animation: fadeInScale 0.3s ease-out forwards; } @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
         </div>
