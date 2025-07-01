@@ -133,7 +133,7 @@ const HistoryModal = ({ isOpen, onClose, item }) => {
                         <p><span className="font-semibold">Motivo:</span> {item.motivo_baja || 'No especificado.'}</p>
                     </div>
                 )}
-                 <p className="italic text-sm text-center pt-4">La función de historial se muestra cuando el equipo ha sido dado de baja.</p>
+                 <p className="italic text-sm text-center pt-4">La función de historial de asignaciones se implementará en una futura versión.</p>
             </div>
         </Modal>
     );
@@ -187,9 +187,11 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     const [filterCategory, setFilterCategory] = useState('Todos');
     const [filterStatus, setFilterStatus] = useState('Activos');
 
+    const isAdmin = user.role === 'Administrador';
+
     useEffect(() => {
-        if (!db || !user?.uid) return;
-        const itemsCollectionPath = `artifacts/${appId}/users/${user.uid}/equipos`;
+        if (!db) return;
+        const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`;
         const q = query(collection(db, itemsCollectionPath));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -200,10 +202,11 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
             setLoading(false);
         });
         return () => unsubscribe();
-    }, [db, user]);
+    }, [db]);
     
     const handleSaveItem = async (itemData) => {
-        const itemsCollectionPath = `artifacts/${appId}/users/${user.uid}/equipos`;
+        if (!isAdmin) return; 
+        const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`;
         const { id, ...dataToSave } = itemData;
         try {
             if (id) {
@@ -216,8 +219,8 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     };
 
     const handleDeactivateItem = async (reason) => {
-        if (!modal.data?.id) return;
-        const itemRef = doc(db, `artifacts/${appId}/users/${user.uid}/equipos`, modal.data.id);
+        if (!isAdmin || !modal.data?.id) return;
+        const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id);
         await updateDoc(itemRef, { 
             estado: 'De Baja', 
             fecha_baja: Timestamp.now(),
@@ -227,9 +230,9 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     };
 
     const handleDeleteItem = async (itemId) => {
-        if (!itemId) return;
+        if (!isAdmin || !itemId) return;
         if (window.confirm("¿Estás seguro de que quieres eliminar este equipo permanentemente? Esta acción es irreversible.")) {
-            await deleteDoc(doc(db, `artifacts/${appId}/users/${user.uid}/equipos`, itemId));
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, itemId));
         }
     };
 
@@ -245,7 +248,7 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
             <div className="max-w-7xl mx-auto">
                  <header className="flex flex-wrap gap-4 justify-between items-center mb-8">
                     <div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div>
-                    <div className="flex items-center gap-4">{user.role === 'Administrador' && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div>
+                    <div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div>
                  </header>
 
                 {view === 'inventory' ? (
@@ -255,7 +258,7 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
                         <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead>
-                                <tbody>{loading ? <tr><td colSpan="6" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button><button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => handleDeleteItem(item.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></div></td></tr> ))}</tbody>
+                                <tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => handleDeleteItem(item.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody>
                             </table>
                         </div>
                     </div>
