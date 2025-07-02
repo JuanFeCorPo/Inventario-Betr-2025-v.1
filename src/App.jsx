@@ -20,7 +20,7 @@ import {
     onSnapshot, 
     query,
     Timestamp,
-    arrayUnion
+    arrayUnion // Importante para el historial
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
@@ -44,15 +44,14 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 const useIdleTimeout = (onIdle, idleTime = 900000) => { // 15 minutos por defecto
     const [timer, setTimer] = useState(null);
 
-    const resetTimer = () => {
-        if (timer) clearTimeout(timer);
-        const newTimer = setTimeout(onIdle, idleTime);
-        setTimer(newTimer);
-    };
-
     useEffect(() => {
+        const resetTimer = () => {
+            if (timer) clearTimeout(timer);
+            const newTimer = setTimeout(onIdle, idleTime);
+            setTimer(newTimer);
+        };
+
         const events = ['mousemove', 'keydown', 'scroll', 'touchstart'];
-        
         const handleActivity = () => resetTimer();
 
         events.forEach(event => window.addEventListener(event, handleActivity));
@@ -62,7 +61,7 @@ const useIdleTimeout = (onIdle, idleTime = 900000) => { // 15 minutos por defect
             events.forEach(event => window.removeEventListener(event, handleActivity));
             if (timer) clearTimeout(timer);
         };
-    }, [onIdle, idleTime]); // Se reinicia si la función onIdle cambia
+    }, [onIdle, idleTime]);
 
     return null;
 };
@@ -182,8 +181,19 @@ export default function App() {
         }
         try {
             const app = initializeApp(firebaseConfig);
-            setAuth(getAuth(app));
-            setDb(getFirestore(app));
+            const authInstance = getAuth(app);
+            // CORRECCIÓN: Establecer la persistencia aquí, una sola vez.
+            setPersistence(authInstance, browserSessionPersistence)
+                .then(() => {
+                    setAuth(authInstance);
+                    setDb(getFirestore(app));
+                })
+                .catch((error) => {
+                    console.error("Error al establecer la persistencia de sesión:", error);
+                    // Continuar de todas formas
+                    setAuth(authInstance);
+                    setDb(getFirestore(app));
+                });
         } catch(e) { 
             console.error("Error inicializando Firebase:", e);
             setConfigError(true);
@@ -212,12 +222,10 @@ export default function App() {
         return () => unsubscribe();
     }, [auth, db]);
 
-    const handleLogin = async (email, password) => {
-        if (!auth) throw new Error("La autenticación de Firebase no está lista.");
-        await setPersistence(auth, browserSessionPersistence); // Establece la persistencia ANTES de iniciar sesión
+    const handleLogin = (email, password) => {
+        // La persistencia ya está establecida, solo iniciamos sesión.
         return signInWithEmailAndPassword(auth, email, password);
     };
-
     const handleLogout = () => signOut(auth);
 
     if (loading) {
