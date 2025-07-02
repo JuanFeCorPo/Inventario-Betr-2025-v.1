@@ -6,8 +6,8 @@ import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
     signOut,
-    setPersistence, // Importante para la gestión de sesión
-    browserSessionPersistence // Define la persistencia a nivel de sesión
+    setPersistence,
+    browserSessionPersistence
 } from 'firebase/auth';
 import { 
     getFirestore, 
@@ -20,12 +20,13 @@ import {
     onSnapshot, 
     query,
     Timestamp,
-    arrayUnion // Importante para el historial
+    arrayUnion
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 let firebaseConfig = null;
+let configError = null;
 try {
     const configFromVite = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env.VITE_FIREBASE_CONFIG : null;
     if (configFromVite) {
@@ -36,15 +37,18 @@ try {
     }
 } catch (e) {
     console.error("Error al parsear la configuración de Firebase:", e);
+    configError = e;
 }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- HOOK PERSONALIZADO PARA EL CIERRE POR INACTIVIDAD ---
-const useIdleTimeout = (onIdle, idleTime = 900000) => { // 15 minutos por defecto
+const useIdleTimeout = (onIdle, user, idleTime = 900000) => { // 15 minutos por defecto
     const [timer, setTimer] = useState(null);
 
     useEffect(() => {
+        if (!user) return; 
+
         const resetTimer = () => {
             if (timer) clearTimeout(timer);
             const newTimer = setTimeout(onIdle, idleTime);
@@ -55,15 +59,13 @@ const useIdleTimeout = (onIdle, idleTime = 900000) => { // 15 minutos por defect
         const handleActivity = () => resetTimer();
 
         events.forEach(event => window.addEventListener(event, handleActivity));
-        resetTimer(); // Inicia el temporizador la primera vez
+        resetTimer();
 
         return () => {
             events.forEach(event => window.removeEventListener(event, handleActivity));
             if (timer) clearTimeout(timer);
         };
-    }, [onIdle, idleTime]);
-
-    return null;
+    }, [user, onIdle, idleTime]);
 };
 
 
@@ -96,7 +98,7 @@ const LoginScreen = ({ onLogin }) => {
     return (
          <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white p-4">
             <div className="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl animate-modal-in">
-                <img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="mx-auto h-12 mb-6" onError={(e) => { e.target.onerror = null; e.target.src='https://i.postimg.cc/L6hypBbp/128x128.png'; }}/>
+                <img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="mx-auto h-16 w-16 mb-6" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/128x128/1f2937/FFFFFF?text=Logo'; }}/>
                 <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario Betrmedia SAS</h1>
                 <p className="text-center text-gray-400 mb-8">Inicia sesión para continuar</p>
                 <form onSubmit={handleLogin} className="space-y-6">
@@ -114,16 +116,15 @@ const LoginScreen = ({ onLogin }) => {
 
 
 // --- PANTALLA PRINCIPAL DEL INVENTARIO (DASHBOARD) ---
-const InventoryDashboard = ({ user, onLogout, db, auth }) => {
+const InventoryDashboard = ({ user, onLogout, db }) => {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('inventory');
     const [modal, setModal] = useState({ type: null, data: null });
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('Todos');
     const [filterStatus, setFilterStatus] = useState('Activos');
     const isAdmin = user.role === 'Administrador';
-    useIdleTimeout(onLogout, 900000); // Cierra sesión después de 15 minutos de inactividad
+    useIdleTimeout(onLogout, user);
 
     useEffect(() => {
         if (!db) return;
@@ -146,13 +147,12 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
     const getStatusBadge = (status) => { const statuses = { 'Disponible': "bg-green-600 text-green-100", 'En Uso': "bg-yellow-600 text-yellow-100", 'En Mantenimiento': "bg-purple-600 text-purple-100", 'De Baja': "bg-gray-500 text-gray-100" }; return <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statuses[status] || 'bg-gray-400'}`}>{status}</span>; };
     const StatCard = ({ title, value, icon, color, onClick }) => ( <button onClick={onClick} className={`w-full text-left bg-gray-800 p-6 rounded-2xl shadow-lg flex items-center space-x-4 transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 ${color.replace('bg-', 'focus:ring-')}`}><div className={`p-3 rounded-full ${color}`}>{icon}</div><div><p className="text-gray-400 text-sm font-medium">{title}</p><p className="text-white text-3xl font-bold">{value}</p></div></button> );
-    const UserManagement = ({ onBack }) => { return ( <div className="animate-modal-in"><header className="flex justify-between items-center mb-8"><div><h1 className="text-3xl font-bold text-white">Administración de Usuarios</h1><p className="text-gray-400">Esta sección es una simulación visual.</p></div></header><div className="bg-gray-800 p-6 rounded-xl text-center text-gray-300"><p>La gestión de usuarios real se implementará con Cloud Functions por seguridad.</p><button onClick={onBack} className="mt-8 px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Volver al Inventario</button></div></div> ); };
     
     return (
         <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
-                 <header className="flex flex-wrap gap-4 justify-between items-center mb-8"><div className="flex items-center gap-4"><img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="h-12 w-12 rounded-lg object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://i.postimg.cc/L6hypBbp/128x128.png'; }}/><div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div></div><div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div></header>
-                {view === 'inventory' ? ( <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div><div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody></table></div></div> ) : ( <UserManagement db={db} auth={auth} onBack={() => setView('inventory')} /> )}
+                 <header className="flex flex-wrap gap-4 justify-between items-center mb-8"><div className="flex items-center gap-4"><img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="h-12 w-12 rounded-lg object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/50x50/1f2937/FFFFFF?text=Error'; }}/><div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div></div><div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => alert("La gestión de usuarios se realiza directamente en la consola de Firebase.")} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div></header>
+                <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div><div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody></table></div></div>
             </div>
             <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={() => setModal({ type: null, data: null })} onSave={handleSaveItem} currentItem={modal.data} />
             <HistoryModal isOpen={modal.type === 'history'} onClose={() => setModal({ type: null, data: null })} item={modal.data} />
@@ -163,6 +163,24 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     );
 };
 
+const ConfigErrorScreen = () => (
+    <div className="bg-gray-900 h-screen flex flex-col justify-center items-center text-white p-8">
+        <div className="text-center">
+            <Frown className="mx-auto text-red-500 mb-6" size={64} strokeWidth={1.5}/>
+            <h1 className="text-4xl font-bold text-white mb-3">Error de Configuración</h1>
+            <p className="text-lg text-gray-400 max-w-2xl mx-auto">La API Key de Firebase es inválida o no se encontró. La aplicación no puede iniciarse.</p>
+        </div>
+        <div className="bg-gray-800 p-6 rounded-2xl text-left w-full max-w-3xl mt-10 shadow-2xl border border-gray-700">
+            <h2 className="text-xl font-semibold mb-4 text-white">¿Cómo solucionarlo?</h2>
+            <ol className="list-decimal list-inside text-gray-300 space-y-3">
+                <li>Sigue la guía "Guía Definitiva de Variables de Entorno" para corregir el valor en Vercel.</li>
+                <li>Asegúrate de copiar el objeto JSON completo y que no falten comillas.</li>
+                <li>Después de guardar la variable, haz **"Redeploy"** en Vercel para aplicar los cambios.</li>
+            </ol>
+        </div>
+    </div>
+);
+
 
 // --- COMPONENTE PRINCIPAL QUE GESTIONA LA APP ---
 export default function App() {
@@ -170,11 +188,10 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [auth, setAuth] = useState(null);
     const [db, setDb] = useState(null);
-    const [configError, setConfigError] = useState(false);
+    const [configErrorState, setConfigError] = useState(configError);
 
     useEffect(() => {
         if (!firebaseConfig) {
-            console.error("Configuración de Firebase no encontrada.");
             setConfigError(true);
             setLoading(false);
             return;
@@ -182,18 +199,8 @@ export default function App() {
         try {
             const app = initializeApp(firebaseConfig);
             const authInstance = getAuth(app);
-            // CORRECCIÓN: Establecer la persistencia aquí, una sola vez.
-            setPersistence(authInstance, browserSessionPersistence)
-                .then(() => {
-                    setAuth(authInstance);
-                    setDb(getFirestore(app));
-                })
-                .catch((error) => {
-                    console.error("Error al establecer la persistencia de sesión:", error);
-                    // Continuar de todas formas
-                    setAuth(authInstance);
-                    setDb(getFirestore(app));
-                });
+            setAuth(authInstance);
+            setDb(getFirestore(app));
         } catch(e) { 
             console.error("Error inicializando Firebase:", e);
             setConfigError(true);
@@ -202,8 +209,8 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        if (!auth || !db) {
-            if (!auth) setLoading(false);
+        if (!auth) {
+            if (loading) setLoading(false);
             return;
         };
 
@@ -222,8 +229,9 @@ export default function App() {
         return () => unsubscribe();
     }, [auth, db]);
 
-    const handleLogin = (email, password) => {
-        // La persistencia ya está establecida, solo iniciamos sesión.
+    const handleLogin = async (email, password) => {
+        if (!auth) throw new Error("La autenticación de Firebase no está lista.");
+        await setPersistence(auth, browserSessionPersistence);
         return signInWithEmailAndPassword(auth, email, password);
     };
     const handleLogout = () => signOut(auth);
@@ -232,12 +240,12 @@ export default function App() {
         return <div className="bg-gray-900 h-screen flex justify-center items-center text-white text-xl">Cargando...</div>;
     }
 
-    if(configError) return <ConfigErrorScreen />;
+    if(configErrorState) return <ConfigErrorScreen />;
 
     return (
         <>
             {user ? (
-                <InventoryDashboard user={user} onLogout={handleLogout} db={db} auth={auth} />
+                <InventoryDashboard user={user} onLogout={handleLogout} db={db} />
             ) : (
                 <LoginScreen onLogin={handleLogin} />
             )}
