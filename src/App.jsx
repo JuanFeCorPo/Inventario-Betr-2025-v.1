@@ -5,7 +5,9 @@ import {
     getAuth, 
     onAuthStateChanged,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    setPersistence, // Importante para la gestión de sesión
+    browserSessionPersistence // Define la persistencia a nivel de sesión
 } from 'firebase/auth';
 import { 
     getFirestore, 
@@ -18,7 +20,7 @@ import {
     onSnapshot, 
     query,
     Timestamp,
-    arrayUnion // Importante para el historial
+    arrayUnion
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
@@ -38,139 +40,40 @@ try {
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- COMPONENTES DE UI REUTILIZABLES ---
-const Modal = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 animate-modal-in">
-            <div className="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-white relative">
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-                    <X size={24} />
-                </button>
-                <h2 className="text-2xl font-bold mb-6">{title}</h2>
-                {children}
-            </div>
-        </div>
-    );
-};
+// --- HOOK PERSONALIZADO PARA EL CIERRE POR INACTIVIDAD ---
+const useIdleTimeout = (onIdle, idleTime = 900000) => { // 15 minutos por defecto
+    const [timer, setTimer] = useState(null);
 
-// --- MODALES ESPECÍFICOS ---
-const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => {
-    const [item, setItem] = useState({});
-    const categorias = ["Periféricos", "Monitores", "Laptops", "CPU", "Cámaras", "Luces", "Audio", "Electrodomésticos", "Otros"];
+    const resetTimer = () => {
+        if (timer) clearTimeout(timer);
+        const newTimer = setTimeout(onIdle, idleTime);
+        setTimer(newTimer);
+    };
 
     useEffect(() => {
-        if (isOpen) {
-            const initialData = currentItem 
-                ? { ...currentItem, fechaIngreso: currentItem.fechaIngreso?.toDate().toISOString().split('T')[0] || '' } 
-                : { nombre: '', categoria: categorias[0], estado: 'Disponible', fechaIngreso: new Date().toISOString().split('T')[0], numeroSerial: '', numeroInventario: '', observaciones: '' };
-            setItem(initialData);
-        }
-    }, [isOpen, currentItem]);
+        const events = ['mousemove', 'keydown', 'scroll', 'touchstart'];
+        
+        const handleActivity = () => resetTimer();
 
-    const handleChange = (e) => setItem(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleSave = (e) => {
-        e.preventDefault();
-        const dataToSave = { ...item };
-        if (dataToSave.fechaIngreso) {
-            dataToSave.fechaIngreso = Timestamp.fromDate(new Date(dataToSave.fechaIngreso));
-        }
-        onSave(dataToSave);
-    };
+        events.forEach(event => window.addEventListener(event, handleActivity));
+        resetTimer(); // Inicia el temporizador la primera vez
 
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={currentItem ? 'Modificar Equipo' : 'Añadir Nuevo Equipo'}>
-            <form onSubmit={handleSave} className="space-y-4">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input name="nombre" value={item.nombre || ''} onChange={handleChange} placeholder="Nombre del Equipo" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required />
-                    <select name="categoria" value={item.categoria || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select>
-                    <input name="numeroSerial" value={item.numeroSerial || ''} onChange={handleChange} placeholder="Número de Serial" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                    <input name="numeroInventario" value={item.numeroInventario || ''} onChange={handleChange} placeholder="Número de Inventario" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required />
-                    <input type="date" name="fechaIngreso" value={item.fechaIngreso || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required />
-                    <select name="estado" value={item.estado || 'Disponible'} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option></select>
-                    <textarea name="observaciones" value={item.observaciones || ''} onChange={handleChange} placeholder="Observaciones" className="bg-gray-700 p-3 rounded-lg md:col-span-2 h-24 focus:outline-none focus:ring-2 focus:ring-orange-500" />
-                </div>
-                <div className="flex justify-end space-x-4 pt-4">
-                    <button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button>
-                    <button type="submit" className="px-6 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 font-semibold transition-colors">Guardar</button>
-                </div>
-            </form>
-        </Modal>
-    );
+        return () => {
+            events.forEach(event => window.removeEventListener(event, handleActivity));
+            if (timer) clearTimeout(timer);
+        };
+    }, [onIdle, idleTime]); // Se reinicia si la función onIdle cambia
+
+    return null;
 };
 
-const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
-    const [reason, setReason] = useState('');
-    const handleConfirm = () => {
-        if (!reason) {
-            alert("Por favor, especifica un motivo para la baja.");
-            return;
-        }
-        onDeactivate(reason);
-    };
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo">
-            <div className="space-y-4">
-                <p>Por favor, especifica el motivo para dar de baja este equipo.</p>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: Pantalla rota, equipo obsoleto..." className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-28" required/>
-                <div className="flex justify-end space-x-4 pt-2">
-                    <button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button>
-                    <button onClick={handleConfirm} className="px-6 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 font-semibold transition-colors">Confirmar Baja</button>
-                </div>
-            </div>
-        </Modal>
-    );
-};
 
-const HistoryModal = ({ isOpen, onClose, item }) => {
-    const sortedHistory = useMemo(() => {
-        if (!item?.history) return [];
-        return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-    }, [item]);
-
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}>
-            <div className="space-y-4 text-gray-300 max-h-[60vh] overflow-y-auto">
-                {sortedHistory.length > 0 ? (
-                    sortedHistory.map((entry, index) => (
-                        <div key={index} className="bg-gray-700/50 p-4 rounded-lg">
-                            <p className="font-semibold text-gray-100">{entry.action}</p>
-                            {entry.changes && entry.changes.length > 0 && (
-                                <ul className="list-disc list-inside mt-2 text-sm">
-                                    {entry.changes.map((change, i) => (
-                                        <li key={i}>
-                                            <span className="capitalize font-medium">{change.field}:</span> de <span className="text-red-400">'{change.from}'</span> a <span className="text-green-400">'{change.to}'</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            <p className="text-xs text-gray-400 mt-2 text-right">
-                                {entry.timestamp?.toDate().toLocaleString()} por <span className="font-medium text-orange-400">{entry.user}</span>
-                            </p>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-center italic">No hay historial de modificaciones para este equipo.</p>
-                )}
-            </div>
-        </Modal>
-    );
-};
-
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => {
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Eliminar ${itemName || 'Equipo'}`}>
-            <div className="space-y-4">
-                <p className="text-lg text-red-300">¡Advertencia! Esta acción es irreversible.</p>
-                <p>¿Estás seguro de que quieres eliminar permanentemente <span className="font-bold text-white">{itemName}</span> de la base de datos?</p>
-                <div className="flex justify-end space-x-4 pt-2">
-                    <button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button>
-                    <button onClick={onConfirm} className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500 font-semibold transition-colors">Sí, Eliminar</button>
-                </div>
-            </div>
-        </Modal>
-    );
-};
+// --- COMPONENTES DE UI Y MODALES ---
+const Modal = ({ isOpen, onClose, title, children }) => { if (!isOpen) return null; return ( <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 animate-modal-in"><div className="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-white relative"><button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={24} /></button><h2 className="text-2xl font-bold mb-6">{title}</h2>{children}</div></div> ); };
+const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => { const [item, setItem] = useState({}); const categorias = ["Periféricos", "Monitores", "Laptops", "CPU", "Cámaras", "Luces", "Audio", "Electrodomésticos", "Otros"]; useEffect(() => { if (isOpen) { const initialData = currentItem ? { ...currentItem, fechaIngreso: currentItem.fechaIngreso?.toDate().toISOString().split('T')[0] || '' } : { nombre: '', categoria: categorias[0], estado: 'Disponible', fechaIngreso: new Date().toISOString().split('T')[0], numeroSerial: '', numeroInventario: '', observaciones: '' }; setItem(initialData); } }, [isOpen, currentItem]); const handleChange = (e) => setItem(prev => ({ ...prev, [e.target.name]: e.target.value })); const handleSave = (e) => { e.preventDefault(); const dataToSave = { ...item }; if (dataToSave.fechaIngreso) { dataToSave.fechaIngreso = Timestamp.fromDate(new Date(dataToSave.fechaIngreso)); } onSave(dataToSave); }; return ( <Modal isOpen={isOpen} onClose={onClose} title={currentItem ? 'Modificar Equipo' : 'Añadir Nuevo Equipo'}><form onSubmit={handleSave} className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input name="nombre" value={item.nombre || ''} onChange={handleChange} placeholder="Nombre del Equipo" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><select name="categoria" value={item.categoria || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><input name="numeroSerial" value={item.numeroSerial || ''} onChange={handleChange} placeholder="Número de Serial" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" /><input name="numeroInventario" value={item.numeroInventario || ''} onChange={handleChange} placeholder="Número de Inventario" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><input type="date" name="fechaIngreso" value={item.fechaIngreso || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><select name="estado" value={item.estado || 'Disponible'} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option></select><textarea name="observaciones" value={item.observaciones || ''} onChange={handleChange} placeholder="Observaciones" className="bg-gray-700 p-3 rounded-lg md:col-span-2 h-24 focus:outline-none focus:ring-2 focus:ring-orange-500" /></div><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button type="submit" className="px-6 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 font-semibold transition-colors">Guardar</button></div></form></Modal> ); };
+const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => { const [reason, setReason] = useState(''); const handleConfirm = () => { if (!reason) { alert("Por favor, especifica un motivo para la baja."); return; } onDeactivate(reason); }; return ( <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo"><div className="space-y-4"><p>Por favor, especifica el motivo para dar de baja este equipo.</p><textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: Pantalla rota, equipo obsoleto..." className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-28" required/><div className="flex justify-end space-x-4 pt-2"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button onClick={handleConfirm} className="px-6 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 font-semibold transition-colors">Confirmar Baja</button></div></div></Modal> ); };
+const HistoryModal = ({ isOpen, onClose, item }) => { const sortedHistory = useMemo(() => { if (!item?.history) return []; return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()); }, [item]); return ( <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}><div className="space-y-4 text-gray-300 max-h-[60vh] overflow-y-auto">{sortedHistory.length > 0 ? ( sortedHistory.map((entry, index) => ( <div key={index} className="bg-gray-700/50 p-4 rounded-lg"><p className="font-semibold text-gray-100">{entry.action}</p>{entry.changes && entry.changes.length > 0 && ( <ul className="list-disc list-inside mt-2 text-sm">{entry.changes.map((change, i) => ( <li key={i}><span className="capitalize font-medium">{change.field}:</span> de <span className="text-red-400">'{change.from}'</span> a <span className="text-green-400">'{change.to}'</span></li> ))}</ul> )}<p className="text-xs text-gray-400 mt-2 text-right">{entry.timestamp?.toDate().toLocaleString()} por <span className="font-medium text-orange-400">{entry.user}</span></p></div> )) ) : ( <p className="text-center italic">No hay historial de modificaciones para este equipo.</p> )}</div></Modal> ); };
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => { return ( <Modal isOpen={isOpen} onClose={onClose} title={`Eliminar ${itemName || 'Equipo'}`}><div className="space-y-4"><p className="text-lg text-red-300">¡Advertencia! Esta acción es irreversible.</p><p>¿Estás seguro de que quieres eliminar permanentemente <span className="font-bold text-white">{itemName}</span> de la base de datos?</p><div className="flex justify-end space-x-4 pt-2"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button onClick={onConfirm} className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500 font-semibold transition-colors">Sí, Eliminar</button></div></div></Modal> ); };
 
 // --- PANTALLA DE LOGIN ---
 const LoginScreen = ({ onLogin }) => {
@@ -194,6 +97,7 @@ const LoginScreen = ({ onLogin }) => {
     return (
          <div className="bg-gray-900 min-h-screen flex items-center justify-center text-white p-4">
             <div className="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl animate-modal-in">
+                <img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="mx-auto h-12 mb-6" onError={(e) => { e.target.onerror = null; e.target.src='https://i.postimg.cc/L6hypBbp/128x128.png'; }}/>
                 <h1 className="text-3xl font-bold text-center text-orange-500 mb-2">Sistema de Inventario Betrmedia SAS</h1>
                 <p className="text-center text-gray-400 mb-8">Inicia sesión para continuar</p>
                 <form onSubmit={handleLogin} className="space-y-6">
@@ -219,8 +123,8 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('Todos');
     const [filterStatus, setFilterStatus] = useState('Activos');
-
     const isAdmin = user.role === 'Administrador';
+    useIdleTimeout(onLogout, 900000); // Cierra sesión después de 15 minutos de inactividad
 
     useEffect(() => {
         if (!db) return;
@@ -230,109 +134,15 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
             const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setItems(itemsData);
             setLoading(false);
-        }, (error) => {
-            console.error("Error al obtener datos del inventario:", error);
-            setLoading(false);
-        });
+        }, (error) => { setLoading(false); });
         return () => unsubscribe();
     }, [db]);
     
-    const handleSaveItem = async (itemData) => {
-        if (!isAdmin) return;
-        const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`;
-        const { id, ...dataToSave } = itemData;
-
-        try {
-            if (id) {
-                const itemRef = doc(db, itemsCollectionPath, id);
-                const docSnap = await getDoc(itemRef);
-                const oldData = docSnap.data();
-                
-                let changes = [];
-                for (const key in dataToSave) {
-                    if (dataToSave[key] !== oldData[key]) {
-                        if (dataToSave[key] instanceof Timestamp && oldData[key] instanceof Timestamp) {
-                            if (!dataToSave[key].isEqual(oldData[key])) {
-                                changes.push({ field: key, from: oldData[key].toDate().toLocaleDateString(), to: dataToSave[key].toDate().toLocaleDateString() });
-                            }
-                        } else if (key !== 'history') {
-                            changes.push({ field: key, from: oldData[key] || "", to: dataToSave[key] || "" });
-                        }
-                    }
-                }
-                
-                const historyEntry = {
-                    timestamp: Timestamp.now(),
-                    user: user.email,
-                    action: 'Equipo modificado.',
-                    changes: changes
-                };
-                await updateDoc(itemRef, { ...dataToSave, history: arrayUnion(historyEntry) });
-
-            } else {
-                 const historyEntry = {
-                    timestamp: Timestamp.now(),
-                    user: user.email,
-                    action: 'Equipo creado en el inventario.'
-                };
-                await addDoc(collection(db, itemsCollectionPath), { ...dataToSave, addedBy: user.uid, createdAt: Timestamp.now(), history: [historyEntry] });
-            }
-            setModal({ type: null, data: null });
-        } catch (error) { console.error("Error guardando equipo:", error); }
-    };
-
-    const handleDeactivateItem = async (reason) => {
-        if (!isAdmin || !modal.data?.id) return;
-        const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id);
-        
-        const historyEntry = {
-            timestamp: Timestamp.now(),
-            user: user.email,
-            action: `Equipo dado de baja: ${reason}`
-        };
-
-        await updateDoc(itemRef, { 
-            estado: 'De Baja', 
-            fecha_baja: Timestamp.now(),
-            motivo_baja: reason,
-            history: arrayUnion(historyEntry)
-        });
-        setModal({ type: null, data: null });
-    };
-
-    const handleDeleteItem = async () => {
-        if (!isAdmin || !modal.data?.id) return;
-        await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id));
-        setModal({ type: null, data: null });
-    };
-
-    const handleStatCardClick = (status) => {
-        if (status === 'Activos') {
-            setFilterStatus('Activos');
-        } else {
-            setFilterStatus(status);
-        }
-    };
-
-    const filteredItems = useMemo(() => {
-        return items.filter(item => {
-            const categoryMatch = filterCategory === 'Todos' || item.categoria === filterCategory;
-            let statusMatch = false;
-            if (filterStatus === 'Todos') {
-                statusMatch = true;
-            } else if (filterStatus === 'Activos') {
-                statusMatch = item.estado !== 'De Baja';
-            } else {
-                statusMatch = item.estado === filterStatus;
-            }
-            const searchMatch = searchTerm === '' || 
-                                (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || 
-                                (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || 
-                                (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase()));
-            return categoryMatch && statusMatch && searchMatch;
-        });
-    }, [items, filterCategory, filterStatus, searchTerm]);
-
+    const handleSaveItem = async (itemData) => { if (!isAdmin) return; const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`; const { id, ...dataToSave } = itemData; try { if (id) { const itemRef = doc(db, itemsCollectionPath, id); const docSnap = await getDoc(itemRef); const oldData = docSnap.data(); let changes = []; for (const key in dataToSave) { if (dataToSave[key] !== oldData[key]) { if (dataToSave[key] instanceof Timestamp && oldData[key] instanceof Timestamp) { if (!dataToSave[key].isEqual(oldData[key])) { changes.push({ field: key, from: oldData[key].toDate().toLocaleDateString(), to: dataToSave[key].toDate().toLocaleDateString() }); } } else if (key !== 'history') { changes.push({ field: key, from: oldData[key] || "", to: dataToSave[key] || "" }); } } } const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo modificado.', changes: changes }; await updateDoc(itemRef, { ...dataToSave, history: arrayUnion(historyEntry) }); } else { const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo creado en el inventario.' }; await addDoc(collection(db, itemsCollectionPath), { ...dataToSave, addedBy: user.uid, createdAt: Timestamp.now(), history: [historyEntry] }); } setModal({ type: null, data: null }); } catch (error) { console.error("Error guardando equipo:", error); } };
+    const handleDeactivateItem = async (reason) => { if (!isAdmin || !modal.data?.id) return; const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id); const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: `Equipo dado de baja. Motivo: ${reason}` }; await updateDoc(itemRef, { estado: 'De Baja', fecha_baja: Timestamp.now(), motivo_baja: reason, history: arrayUnion(historyEntry) }); setModal({ type: null, data: null }); };
+    const handleDeleteItem = async () => { if (!isAdmin || !modal.data?.id) return; await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id)); setModal({ type: null, data: null }); };
+    const handleStatCardClick = (status) => { if (status === 'Activos') { setFilterStatus('Activos'); } else { setFilterStatus(status); } };
+    const filteredItems = useMemo(() => { return items.filter(item => { const categoryMatch = filterCategory === 'Todos' || item.categoria === filterCategory; let statusMatch = false; if (filterStatus === 'Todos') { statusMatch = true; } else if (filterStatus === 'Activos') { statusMatch = item.estado !== 'De Baja'; } else { statusMatch = item.estado === filterStatus; } const searchMatch = searchTerm === '' || (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase())); return categoryMatch && statusMatch && searchMatch; }); }, [items, filterCategory, filterStatus, searchTerm]);
     const stats = useMemo(() => { const activos = items.filter(item => item.estado !== 'De Baja'); return { total: activos.length, disponibles: activos.filter(item => item.estado === 'Disponible').length, enUso: activos.filter(item => item.estado === 'En Uso').length, deBaja: items.filter(item => item.estado === 'De Baja').length }; }, [items]);
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
     const getStatusBadge = (status) => { const statuses = { 'Disponible': "bg-green-600 text-green-100", 'En Uso': "bg-yellow-600 text-yellow-100", 'En Mantenimiento': "bg-purple-600 text-purple-100", 'De Baja': "bg-gray-500 text-gray-100" }; return <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statuses[status] || 'bg-gray-400'}`}>{status}</span>; };
@@ -342,37 +152,13 @@ const InventoryDashboard = ({ user, onLogout, db, auth }) => {
     return (
         <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
-                 <header className="flex flex-wrap gap-4 justify-between items-center mb-8">
-                    <div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div>
-                    <div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div>
-                 </header>
-
-                {view === 'inventory' ? (
-                    <div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} />
-                            <StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} />
-                            <StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} />
-                            <StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} />
-                        </div>
-                        <div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div>
-                        <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead>
-                                <tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody>
-                            </table>
-                        </div>
-                    </div>
-                ) : (
-                    <UserManagement db={db} auth={auth} onBack={() => setView('inventory')} />
-                )}
+                 <header className="flex flex-wrap gap-4 justify-between items-center mb-8"><div className="flex items-center gap-4"><img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="h-12 w-12 rounded-lg object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://i.postimg.cc/L6hypBbp/128x128.png'; }}/><div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div></div><div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => setView('users')} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div></header>
+                {view === 'inventory' ? ( <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div><div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody></table></div></div> ) : ( <UserManagement db={db} auth={auth} onBack={() => setView('inventory')} /> )}
             </div>
-            
             <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={() => setModal({ type: null, data: null })} onSave={handleSaveItem} currentItem={modal.data} />
             <HistoryModal isOpen={modal.type === 'history'} onClose={() => setModal({ type: null, data: null })} item={modal.data} />
             <DeactivateModal isOpen={modal.type === 'deactivate'} onClose={() => setModal({ type: null, data: null })} onDeactivate={handleDeactivateItem} />
             <DeleteConfirmModal isOpen={modal.type === 'delete'} onClose={() => setModal({ type: null, data: null })} onConfirm={handleDeleteItem} itemName={modal.data?.nombre} />
-            
             <style>{`.animate-modal-in { animation: fadeInScale 0.3s ease-out forwards; } @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }`}</style>
         </div>
     );
@@ -426,9 +212,12 @@ export default function App() {
         return () => unsubscribe();
     }, [auth, db]);
 
-    const handleLogin = (email, password) => {
+    const handleLogin = async (email, password) => {
+        if (!auth) throw new Error("La autenticación de Firebase no está lista.");
+        await setPersistence(auth, browserSessionPersistence); // Establece la persistencia ANTES de iniciar sesión
         return signInWithEmailAndPassword(auth, email, password);
     };
+
     const handleLogout = () => signOut(auth);
 
     if (loading) {
