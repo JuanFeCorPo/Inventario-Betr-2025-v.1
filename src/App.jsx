@@ -242,7 +242,7 @@ export default function App() {
         return <div className="bg-gray-900 h-screen flex justify-center items-center text-white text-xl">Cargando...</div>;
     }
 
-    if(configErrorState) return <ConfigErrorScreen />;
+    if(configError) return <ConfigErrorScreen />;
 
     return (
         <>
