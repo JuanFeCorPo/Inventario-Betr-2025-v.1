@@ -122,7 +122,29 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
     const handleDeactivateItem = async (reason) => { if (!isAdmin || !modal.data?.id) return; const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id); const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: `Equipo dado de baja. Motivo: ${reason}` }; await updateDoc(itemRef, { estado: 'De Baja', fecha_baja: Timestamp.now(), motivo_baja: reason, history: arrayUnion(historyEntry) }); setModal({ type: null, data: null }); };
     const handleDeleteItem = async () => { if (!isAdmin || !modal.data?.id) return; await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id)); setModal({ type: null, data: null }); };
     const handleStatCardClick = (status) => { if (status === 'Activos') { setFilterStatus('Activos'); } else { setFilterStatus(status); } };
-    const filteredItems = useMemo(() => { return items.filter(item => { const categoryMatch = filterCategory === 'Todos' || item.categoria === filterCategory; let statusMatch = false; if (filterStatus === 'Todos') { statusMatch = true; } else if (filterStatus === 'Activos') { statusMatch = item.estado !== 'De Baja'; } else { statusMatch = item.estado === filterStatus; } const searchMatch = searchTerm === '' || (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) || (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase())); return categoryMatch && statusMatch && searchMatch; }); }, [items, filterCategory, filterStatus, searchTerm]);
+    const filteredItems = useMemo(() => {
+        const filtered = items.filter(item => {
+            const categoryMatch = filterCategory === 'Todos' || item.categoria === filterCategory;
+            let statusMatch = false;
+            if (filterStatus === 'Todos') {
+                statusMatch = true;
+            } else if (filterStatus === 'Activos') {
+                statusMatch = item.estado !== 'De Baja';
+            } else {
+                statusMatch = item.estado === filterStatus;
+            }
+            const searchMatch = searchTerm === '' || 
+                (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        return categoryMatch && statusMatch && searchMatch;
+    });
+
+    // Ordenar alfabéticamente por nombre
+    return filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
+}, [items, filterCategory, filterStatus, searchTerm]);
+
     const stats = useMemo(() => { const activos = items.filter(item => item.estado !== 'De Baja'); return { total: activos.length, disponibles: activos.filter(item => item.estado === 'Disponible').length, enUso: activos.filter(item => item.estado === 'En Uso').length, deBaja: items.filter(item => item.estado === 'De Baja').length }; }, [items]);
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
     const getStatusBadge = (status) => { const statuses = { 'Disponible': "bg-green-600 text-green-100", 'En Uso': "bg-yellow-600 text-yellow-100", 'En Mantenimiento': "bg-purple-600 text-purple-100", 'De Baja': "bg-gray-500 text-gray-100" }; return <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statuses[status] || 'bg-gray-400'}`}>{status}</span>; };
@@ -132,7 +154,37 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
         <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
                  <header className="flex flex-wrap gap-4 justify-between items-center mb-8"><div className="flex items-center gap-4"><img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="h-12 w-12 rounded-lg object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/50x50/1f2937/FFFFFF?text=Error'; }}/><div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div></div><div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => alert("La gestión de usuarios se realiza directamente en la consola de Firebase.")} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div></header>
-                <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-1/3 bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"/><div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div><div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 truncate max-w-xs">{item.observaciones}</td><td className="p-4">{getStatusBadge(item.estado)}</td><td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody></table></div></div>
+                <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><div className="relative w-full md:w-1/3">
+  <input
+    type="text"
+    placeholder="Buscar..."
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+    className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white pr-10"
+  />
+  {searchTerm && (
+    <button
+      onClick={() => setSearchTerm('')}
+      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+    >
+      <X size={18} />
+    </button>
+  )}
+</div>
+
+<div className="flex-grow"></div><select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full md:w-auto bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-white"><option value="Activos">Activos</option><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="De Baja">De Baja</option><option value="Todos">Todos</option></select></div><div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden"><table className="w-full text-left"><thead className="bg-gray-700/50"><tr><th className="p-4">Nombre</th><th className="p-4">Nº Inventario</th><th className="p-4">Serial</th><th className="p-4">Categoría</th><th className="p-4">Observaciones</th><th className="p-4">Estado</th><th className="p-4 text-center">Acciones</th></tr></thead><tbody>{loading ? <tr><td colSpan="7" className="text-center p-8">Cargando equipos...</td></tr> : filteredItems.map((item) => ( <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/50"><td className="p-4 font-medium text-white">{item.nombre}</td><td className="p-4">{item.numeroInventario}</td><td className="p-4">{item.numeroSerial}</td><td className="p-4">{item.categoria}</td><td className="p-4 max-w-xs whitespace-normal break-words text-sm text-gray-200">
+  {item.observaciones || 'Sin observaciones'}
+</td>
+<td className="p-4">
+  <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap 
+    ${item.estado === 'Disponible' ? 'bg-green-600 text-white' :
+      item.estado === 'En Uso' ? 'bg-yellow-500 text-white' :
+      item.estado === 'En Mantenimiento' ? 'bg-purple-600 text-white' :
+      item.estado === 'De Baja' ? 'bg-gray-500 text-white' : 'bg-gray-400 text-white'}`}>
+    {item.estado}
+  </span>
+</td>
+<td className="p-4"><div className="flex justify-center items-center space-x-3"><button onClick={() => setModal({ type: 'history', data: item })} className="text-blue-400 hover:text-blue-300"><History size={18}/></button>{isAdmin && (<> <button onClick={() => setModal({ type: 'edit', data: item })} className="text-orange-400 hover:text-orange-300"><Edit size={18}/></button>{item.estado !== 'De Baja' && (<button onClick={() => setModal({ type: 'deactivate', data: item })} className="text-yellow-400 hover:text-yellow-300"><Archive size={18}/></button>)}<button onClick={() => setModal({ type: 'delete', data: item })} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button></>)}</div></td></tr> ))}</tbody></table></div></div>
             </div>
             <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={() => setModal({ type: null, data: null })} onSave={handleSaveItem} currentItem={modal.data} />
             <HistoryModal isOpen={modal.type === 'history'} onClose={() => setModal({ type: null, data: null })} item={modal.data} />
