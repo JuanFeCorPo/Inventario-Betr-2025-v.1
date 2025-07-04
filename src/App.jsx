@@ -24,8 +24,6 @@ import {
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
-// Importación del hook personalizado para manejar el cierre por inactividad
-import useIdleTimeout from './useIdleTimeout';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 let firebaseConfig = null;
@@ -44,6 +42,10 @@ try {
 }
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+
+// Importación del hook personalizado para manejar el cierre por inactividad
+import useIdleTimeout from './useIdleTimeout';
 
 
 
