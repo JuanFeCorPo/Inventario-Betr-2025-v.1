@@ -55,7 +55,7 @@ const useIdleTimeout = (onIdle, user, idleTime = 900000) => { // 15 minutos por 
             setTimer(newTimer);
         };
 
-        const events = ['mousemove', 'keydown', 'scroll', 'touchstart'];
+        const events = ['mousemove', 'keydown', 'scroll', 'touchstart','click'];
         const handleActivity = () => resetTimer();
 
         events.forEach(event => window.addEventListener(event, handleActivity));
