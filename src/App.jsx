@@ -24,6 +24,9 @@ import {
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
 
+// Importación del hook personalizado para manejar el cierre por inactividad
+import useIdleTimeout from './useIdleTimeout';
+
 // --- CONFIGURACIÓN DE FIREBASE ---
 let firebaseConfig = null;
 let configError = null;
@@ -43,19 +46,23 @@ try {
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- HOOK PERSONALIZADO PARA EL CIERRE POR INACTIVIDAD ---
-const useIdleTimeout = (onIdle, user, idleTime = 900000) => { // 15 minutos por defecto
-    const [timer, setTimer] = useState(null);
+import { useEffect, useRef } from 'react';
+
+const useIdleTimeout = (onIdle, user, idleTime = 900000) => {
+    const timerRef = useRef(null);
+    const events = ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
 
     useEffect(() => {
-        if (!user) return; 
+        if (!user) return;
 
         const resetTimer = () => {
-            if (timer) clearTimeout(timer);
-            const newTimer = setTimeout(onIdle, idleTime);
-            setTimer(newTimer);
+            if (timerRef.current) clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => {
+                console.log("Sesión cerrada por inactividad");
+                onIdle();
+            }, idleTime);
         };
 
-        const events = ['mousemove', 'keydown', 'scroll', 'touchstart','click'];
         const handleActivity = () => resetTimer();
 
         events.forEach(event => window.addEventListener(event, handleActivity));
@@ -63,10 +70,13 @@ const useIdleTimeout = (onIdle, user, idleTime = 900000) => { // 15 minutos por 
 
         return () => {
             events.forEach(event => window.removeEventListener(event, handleActivity));
-            if (timer) clearTimeout(timer);
+            if (timerRef.current) clearTimeout(timerRef.current);
         };
-    }, [user, onIdle, idleTime]);
+    }, [user, idleTime, onIdle]);
 };
+
+
+
 
 
 // --- COMPONENTES DE UI Y MODALES ---
