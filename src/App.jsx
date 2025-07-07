@@ -111,6 +111,7 @@ const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
     );
 };
 
+
 // MOSTRAR FECHA DE BAJA EN EL HISTORIAL
 const HistoryModal = ({ isOpen, onClose, item }) => {
     const sortedHistory = useMemo(() => {
