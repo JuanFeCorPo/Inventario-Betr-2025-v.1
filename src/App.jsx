@@ -52,8 +52,97 @@ import useIdleTimeout from './useIdleTimeout';
 // --- COMPONENTES DE UI Y MODALES ---
 const Modal = ({ isOpen, onClose, title, children }) => { if (!isOpen) return null; return ( <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 animate-modal-in"><div className="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-2xl text-white relative"><button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X size={24} /></button><h2 className="text-2xl font-bold mb-6">{title}</h2>{children}</div></div> ); };
 const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => { const [item, setItem] = useState({}); const categorias = ["Periféricos", "Monitores", "Laptops", "CPU", "Cámaras", "Luces", "Audio", "Electrodomésticos", "Otros"]; useEffect(() => { if (isOpen) { const initialData = currentItem ? { ...currentItem, fechaIngreso: currentItem.fechaIngreso?.toDate().toISOString().split('T')[0] || '' } : { nombre: '', categoria: categorias[0], estado: 'Disponible', fechaIngreso: new Date().toISOString().split('T')[0], numeroSerial: '', numeroInventario: '', observaciones: '' }; setItem(initialData); } }, [isOpen, currentItem]); const handleChange = (e) => setItem(prev => ({ ...prev, [e.target.name]: e.target.value })); const handleSave = (e) => { e.preventDefault(); const dataToSave = { ...item }; if (dataToSave.fechaIngreso) { dataToSave.fechaIngreso = Timestamp.fromDate(new Date(dataToSave.fechaIngreso)); } onSave(dataToSave); }; return ( <Modal isOpen={isOpen} onClose={onClose} title={currentItem ? 'Modificar Equipo' : 'Añadir Nuevo Equipo'}><form onSubmit={handleSave} className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input name="nombre" value={item.nombre || ''} onChange={handleChange} placeholder="Nombre del Equipo" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><select name="categoria" value={item.categoria || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500">{categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select><input name="numeroSerial" value={item.numeroSerial || ''} onChange={handleChange} placeholder="Número de Serial" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" /><input name="numeroInventario" value={item.numeroInventario || ''} onChange={handleChange} placeholder="Número de Inventario" className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><input type="date" name="fechaIngreso" value={item.fechaIngreso || ''} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" required /><select name="estado" value={item.estado || 'Disponible'} onChange={handleChange} className="bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"><option value="Disponible">Disponible</option><option value="En Uso">En Uso</option><option value="En Mantenimiento">En Mantenimiento</option><option value="Fuera de Servicio">Fuera de Servicio</option></select><textarea name="observaciones" value={item.observaciones || ''} onChange={handleChange} placeholder="Observaciones" className="bg-gray-700 p-3 rounded-lg md:col-span-2 h-24 focus:outline-none focus:ring-2 focus:ring-orange-500" /></div><div className="flex justify-end space-x-4 pt-4"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button type="submit" className="px-6 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 font-semibold transition-colors">Guardar</button></div></form></Modal> ); };
-const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => { const [reason, setReason] = useState(''); const handleConfirm = () => { if (!reason) { alert("Por favor, especifica un motivo para la baja."); return; } onDeactivate(reason); }; return ( <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo"><div className="space-y-4"><p>Por favor, especifica el motivo para dar de baja este equipo.</p><textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: Pantalla rota, equipo obsoleto..." className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-28" required/><div className="flex justify-end space-x-4 pt-2"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button onClick={handleConfirm} className="px-6 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 font-semibold transition-colors">Confirmar Baja</button></div></div></Modal> ); };
-const HistoryModal = ({ isOpen, onClose, item }) => { const sortedHistory = useMemo(() => { if (!item?.history) return []; return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()); }, [item]); return ( <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}><div className="space-y-4 text-gray-300 max-h-[60vh] overflow-y-auto">{sortedHistory.length > 0 ? ( sortedHistory.map((entry, index) => ( <div key={index} className="bg-gray-700/50 p-4 rounded-lg"><p className="font-semibold text-gray-100">{entry.action}</p>{entry.changes && entry.changes.length > 0 && ( <ul className="list-disc list-inside mt-2 text-sm">{entry.changes.map((change, i) => ( <li key={i}><span className="capitalize font-medium">{change.field}:</span> de <span className="text-red-400">'{change.from}'</span> a <span className="text-green-400">'{change.to}'</span></li> ))}</ul> )}<p className="text-xs text-gray-400 mt-2 text-right">{entry.timestamp?.toDate().toLocaleString()} por <span className="font-medium text-orange-400">{entry.user}</span></p></div> )) ) : ( <p className="text-center italic">No hay historial de modificaciones para este equipo.</p> )}</div></Modal> ); };
+
+// AGREGAR FECHA DE BAJA Y MOTIVO DE FORMA MANUAL
+const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
+    const [reason, setReason] = useState('');
+    const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
+
+    const handleConfirm = () => {
+        if (!reason || !fecha) {
+            alert("Por favor, completa el motivo y la fecha de baja.");
+            return;
+        }
+        onDeactivate(reason, fecha);
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo">
+            <div className="space-y-4">
+                <p>Especifica el motivo y la fecha para dar de baja este equipo.</p>
+                <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Ej: Pantalla rota, equipo obsoleto..."
+                    className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 h-28"
+                    required
+                />
+                <input
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    className="w-full bg-gray-700 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                />
+                <div className="flex justify-end space-x-4 pt-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleConfirm}
+                        className="px-6 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 font-semibold transition-colors"
+                    >
+                        Confirmar Baja
+                    </button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+// MOSTRAR FECHA DE BAJA EN EL HISTORIAL
+const HistoryModal = ({ isOpen, onClose, item }) => {
+    const sortedHistory = useMemo(() => {
+        if (!item?.history) return [];
+        return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+    }, [item]);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Historial de ${item?.nombre}`}>
+            <div className="space-y-4 text-gray-300 max-h-[60vh] overflow-y-auto">
+                {sortedHistory.length > 0 ? (
+                    sortedHistory.map((entry, index) => (
+                        <div key={index} className="bg-gray-700/50 p-4 rounded-lg">
+                            <p className="font-semibold text-gray-100 whitespace-pre-line">{entry.action}</p>
+                            {entry.fechaBaja && (
+                                <p className="text-sm text-gray-400 mt-1">Fecha de Baja: {entry.fechaBaja.toDate().toLocaleDateString()}</p>
+                            )}
+                            {entry.changes && entry.changes.length > 0 && (
+                                <ul className="list-disc list-inside mt-2 text-sm">
+                                    {entry.changes.map((change, i) => (
+                                        <li key={i}>
+                                            <span className="capitalize font-medium">{change.field}:</span> de <span className="text-red-400">'{change.from}'</span> a <span className="text-green-400">'{change.to}'</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <p className="text-xs text-gray-400 mt-2 text-right">
+                                {entry.timestamp?.toDate().toLocaleString()} por <span className="font-medium text-orange-400">{entry.user}</span>
+                            </p>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-center italic">No hay historial de modificaciones para este equipo.</p>
+                )}
+            </div>
+        </Modal>
+    );
+};
+
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => { return ( <Modal isOpen={isOpen} onClose={onClose} title={`Eliminar ${itemName || 'Equipo'}`}><div className="space-y-4"><p className="text-lg text-red-300">¡Advertencia! Esta acción es irreversible.</p><p>¿Estás seguro de que quieres eliminar permanentemente <span className="font-bold text-white">{itemName}</span> de la base de datos?</p><div className="flex justify-end space-x-4 pt-2"><button type="button" onClick={onClose} className="px-6 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition-colors">Cancelar</button><button onClick={onConfirm} className="px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500 font-semibold transition-colors">Sí, Eliminar</button></div></div></Modal> ); };
 
 // --- PANTALLA DE LOGIN ---
@@ -119,7 +208,29 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
     }, [db]);
     
     const handleSaveItem = async (itemData) => { if (!isAdmin) return; const itemsCollectionPath = `artifacts/${appId}/public/data/equipos`; const { id, ...dataToSave } = itemData; try { if (id) { const itemRef = doc(db, itemsCollectionPath, id); const docSnap = await getDoc(itemRef); const oldData = docSnap.data(); let changes = []; for (const key in dataToSave) { if (dataToSave[key] !== oldData[key]) { if (dataToSave[key] instanceof Timestamp && oldData[key] instanceof Timestamp) { if (!dataToSave[key].isEqual(oldData[key])) { changes.push({ field: key, from: oldData[key].toDate().toLocaleDateString(), to: dataToSave[key].toDate().toLocaleDateString() }); } } else if (key !== 'history') { changes.push({ field: key, from: oldData[key] || "", to: dataToSave[key] || "" }); } } } const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo modificado.', changes: changes }; await updateDoc(itemRef, { ...dataToSave, history: arrayUnion(historyEntry) }); } else { const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo creado en el inventario.' }; await addDoc(collection(db, itemsCollectionPath), { ...dataToSave, addedBy: user.uid, createdAt: Timestamp.now(), history: [historyEntry] }); } setModal({ type: null, data: null }); } catch (error) { console.error("Error guardando equipo:", error); } };
-    const handleDeactivateItem = async (reason) => { if (!isAdmin || !modal.data?.id) return; const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id); const historyEntry = { timestamp: Timestamp.now(), user: user.email, action: `Equipo dado de baja. Motivo: ${reason}` }; await updateDoc(itemRef, { estado: 'De Baja', fecha_baja: Timestamp.now(), motivo_baja: reason, history: arrayUnion(historyEntry) }); setModal({ type: null, data: null }); };
+    const handleDeactivateItem = async (reason, fecha) => {
+    if (!isAdmin || !modal.data?.id) return;
+    try {
+        const itemRef = doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id);
+        const fechaTimestamp = Timestamp.fromDate(new Date(fecha));
+        const historyEntry = {
+            timestamp: Timestamp.now(),
+            user: user.email,
+            action: `Equipo dado de baja.\nMotivo: ${reason}`,
+            fechaBaja: fechaTimestamp
+        };
+        await updateDoc(itemRef, {
+            estado: 'De Baja',
+            fecha_baja: fechaTimestamp,
+            motivo_baja: reason,
+            history: arrayUnion(historyEntry)
+        });
+        setModal({ type: null, data: null });
+    } catch (error) {
+        console.error("Error al dar de baja el equipo:", error);
+    }
+};
+
     const handleDeleteItem = async () => { if (!isAdmin || !modal.data?.id) return; await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipos`, modal.data.id)); setModal({ type: null, data: null }); };
     const handleStatCardClick = (status) => { if (status === 'Activos') { setFilterStatus('Activos'); } else { setFilterStatus(status); } };
     const filteredItems = useMemo(() => {
