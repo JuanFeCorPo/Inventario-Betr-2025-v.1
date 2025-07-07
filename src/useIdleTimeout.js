@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const useIdleTimeout = (onIdle, user, idleTime = 900000) => {
     const timerRef = useRef(null);
-    const [showModal, setShowModal] = useState(false);
+    const [expired, setExpired] = useState(false);
     const events = ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
 
     useEffect(() => {
@@ -10,44 +10,31 @@ const useIdleTimeout = (onIdle, user, idleTime = 900000) => {
 
         const resetTimer = () => {
             clearTimeout(timerRef.current);
+            setExpired(false);
             timerRef.current = setTimeout(() => {
-                setShowModal(true);
+                setExpired(true);
                 setTimeout(() => {
                     onIdle();
-                }, 4000); // Mostrar modal antes de cerrar sesión
+                }, 4000);
             }, idleTime);
         };
 
-        const handleActivity = () => {
-            setShowModal(false);
-            resetTimer();
-        };
+        const handleActivity = () => resetTimer();
 
         events.forEach(event => window.addEventListener(event, handleActivity));
         resetTimer();
 
-        // Cierre en recarga o cierre de pestaña
-        const handleBeforeUnload = () => {
-            onIdle();
-        };
-        window.addEventListener("beforeunload", handleBeforeUnload);
+        window.addEventListener("beforeunload", onIdle);
 
         return () => {
             events.forEach(event => window.removeEventListener(event, handleActivity));
-            window.removeEventListener("beforeunload", handleBeforeUnload);
+            window.removeEventListener("beforeunload", onIdle);
             clearTimeout(timerRef.current);
         };
     }, [user, idleTime, onIdle]);
 
-    // Modal bonito con Tailwind
-    return showModal ? (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
-            <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl text-white text-center max-w-md">
-                <h2 className="text-2xl font-bold mb-4 text-orange-400">Sesión cerrada por inactividad</h2>
-                <p>Has estado inactivo por un tiempo. Por seguridad, se cerrará tu sesión.</p>
-            </div>
-        </div>
-    ) : null;
+    return expired;
 };
 
 export default useIdleTimeout;
+
