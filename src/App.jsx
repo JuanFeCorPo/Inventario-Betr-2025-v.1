@@ -58,6 +58,13 @@ const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
     const [reason, setReason] = useState('');
     const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
 
+    useEffect(() => {
+        if (isOpen) {
+            setReason('');
+            setFecha(new Date().toISOString().split('T')[0]);
+        }
+    }, [isOpen]);
+
     const handleConfirm = () => {
         if (!reason || !fecha) {
             alert("Por favor, completa el motivo y la fecha de baja.");
