@@ -24,11 +24,11 @@ const useIdleTimeout = (onIdle, user, idleTime = 900000) => {
         events.forEach(event => window.addEventListener(event, handleActivity));
         resetTimer();
 
-        window.addEventListener("beforeunload", onIdle);
+        window.addEventListener("afterunload", onIdle);
 
         return () => {
             events.forEach(event => window.removeEventListener(event, handleActivity));
-            window.removeEventListener("beforeunload", onIdle);
+            window.removeEventListener("afterunload", onIdle);
             clearTimeout(timerRef.current);
         };
     }, [user, idleTime, onIdle]);
