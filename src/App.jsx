@@ -23,7 +23,7 @@ import {
     arrayUnion
 } from 'firebase/firestore';
 import { CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2, Box, Users, Archive, UserPlus, LogOut, Frown, History, X } from 'lucide-react';
-
+import { Wrench } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 let firebaseConfig = null;
@@ -272,7 +272,18 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
     return filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
 }, [items, filterCategory, filterStatus, searchTerm]);
 
-    const stats = useMemo(() => { const activos = items.filter(item => item.estado !== 'De Baja'); return { total: activos.length, disponibles: activos.filter(item => item.estado === 'Disponible').length, enUso: activos.filter(item => item.estado === 'En Uso').length, deBaja: items.filter(item => item.estado === 'De Baja').length }; }, [items]);
+    const stats = useMemo(() => {
+  const activos = items.filter(item => item.estado !== 'De Baja');
+  return {
+    total: activos.length,
+    disponibles: activos.filter(item => item.estado === 'Disponible').length,
+    enUso: activos.filter(item => item.estado === 'En Uso').length,
+    enMantenimiento: activos.filter(item => item.estado === 'En Mantenimiento').length,
+    fueraServicio: activos.filter(item => item.estado === 'Fuera de Servicio').length,
+    deBaja: items.filter(item => item.estado === 'De Baja').length
+  };
+}, [items]);
+
     const categorias = useMemo(() => ['Todos', ...new Set(items.map(item => item.categoria))], [items]);
     const categoryCount = useMemo(() => {
     if (filterCategory === 'Todos') return null;
@@ -287,7 +298,7 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
             {sessionExpired && <IdleModal />}
             <div className="max-w-7xl mx-auto">
                  <header className="flex flex-wrap gap-4 justify-between items-center mb-8"><div className="flex items-center gap-4"><img src="https://i.postimg.cc/L6hypBbp/128x128.png" alt="Logotipo de la Empresa" className="h-12 w-12 rounded-lg object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/50x50/1f2937/FFFFFF?text=Error'; }}/><div><h1 className="text-3xl font-bold text-white">Sistema de Inventario Betrmedia SAS</h1><p className="text-gray-400">Bienvenido, <span className="font-semibold text-orange-400">{user.email}</span> ({user.role})</p></div></div><div className="flex items-center gap-4">{isAdmin && ( <button onClick={() => alert("La gestión de usuarios se realiza directamente en la consola de Firebase.")} className="flex items-center space-x-2 bg-gray-700 text-white px-5 py-3 rounded-xl font-semibold hover:bg-gray-600 transition-colors"><Users size={20} /><span>Usuarios</span></button> )}<button onClick={() => setModal({ type: 'add', data: null })} className="flex items-center space-x-2 bg-orange-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-orange-500 transition-all duration-300 shadow-lg hover:shadow-orange-500/50"><PlusCircle size={20} /><span>Añadir Equipo</span></button><button onClick={onLogout} className="p-3 bg-gray-700 rounded-xl hover:bg-red-500 transition-colors"><LogOut size={20}/></button></div></header>
-                <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><div className="relative w-full md:w-1/3">
+                <div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"><StatCard title="Equipos Activos" value={stats.total} icon={<Box size={24} className="text-white"/>} color="bg-orange-500" onClick={() => handleStatCardClick('Activos')} /><StatCard title="Disponibles" value={stats.disponibles} icon={<CheckCircle size={24} className="text-white"/>} color="bg-green-500" onClick={() => handleStatCardClick('Disponible')} /><StatCard title="En Uso" value={stats.enUso} icon={<Users size={24} className="text-white"/>} color="bg-yellow-500" onClick={() => handleStatCardClick('En Uso')} /><StatCard title="Dados de Baja" value={stats.deBaja} icon={<Archive size={24} className="text-white"/>} color="bg-gray-600" onClick={() => handleStatCardClick('De Baja')} /><StatCard title="En Mantenimiento" value={stats.enMantenimiento} icon={<Wrench size={24} className="text-white"/>} color="bg-purple-600" onClick={() => handleStatCardClick('En Mantenimiento')} /> <StatCard title="Fuera de Servicio" value={stats.fueraServicio} icon={<AlertTriangle size={24} className="text-white"/>} color="bg-red-600" onClick={() => handleStatCardClick('Fuera de Servicio')} /></div><div className="bg-gray-800 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-4"><div className="relative w-full md:w-1/3">
   <input
     type="text"
     placeholder="Buscar..."
