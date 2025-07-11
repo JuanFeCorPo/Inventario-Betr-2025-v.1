@@ -263,7 +263,7 @@ const InventoryDashboard = ({ user, onLogout, db }) => {
             const searchMatch = searchTerm === '' || 
                 (item.nombre && item.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.numeroSerial && item.numeroSerial.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase()));
+                (item.numeroInventario && item.numeroInventario.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.personaEncargada && item.personaEncargada.toLowerCase().includes(searchTerm.toLowerCase()));
 
         return categoryMatch && statusMatch && searchMatch;
