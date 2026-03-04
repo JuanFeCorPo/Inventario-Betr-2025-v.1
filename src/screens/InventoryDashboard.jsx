@@ -145,7 +145,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
   const openModal  = (type, data = null) => setModal({ type, data });
   const closeModal = () => setModal({ type: null, data: null });
-  const handleSave       = async (data)          => { await saveItem(data); closeModal(); };
+  const handleSave = async (data) => { await saveItem(data); closeModal(); };
   const handleDeactivate = async (reason, fecha) => { await deactivateItem(modal.data.id, reason, fecha); closeModal(); };
   const handleDelete     = async ()              => { await deleteItem(modal.data.id); closeModal(); };
 
