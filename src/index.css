@@ -1,3 +1,42 @@
+@import url('https://fonts.cdnfonts.com/css/greycliff-cf');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --brand-orange:  #E68E00;
+  --brand-amber:   #EDAA00;
+  --brand-yellow:  #F4DB44;
+  --brand-slate:   #5E6A74;
+  --brand-gray:    #8D8D8D;
+  --bg-base:       #cccccc;
+  --bg-surface:    #FFFFFF;
+  --text-primary:  #1C2B35;
+  --text-secondary:#5E6A74;
+  --text-muted:    #8D8D8D;
+}
+
+body {
+  font-family: 'Greycliff CF', 'Inter', system-ui, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  .animate-modal-in {
+    animation: fadeInScale 0.25s ease-out forwards;
+  }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #5E6A7440; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #5E6A7480; }
