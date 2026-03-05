@@ -199,7 +199,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               <p className="text-xs text-[#8D8D8D] truncate hidden sm:block">
                 {user.email} · <span className="text-[#E68E00] font-medium">{user.role}</span>
               </p>
-            </div>
+            </div> 
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">

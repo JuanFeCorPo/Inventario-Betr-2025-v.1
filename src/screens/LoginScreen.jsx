@@ -33,7 +33,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
             className="mx-auto h-16 w-auto object-contain mb-5"
             onError={e => { e.target.onerror = null; e.target.src = LOGO_FALLBACK; }}
           />
-          <h1 className="text-2xl font-bold text-[#1C2B35] tracking-tight">Inventario Betrmedia</h1>
+          <h1 className="text-2xl font-bold text-[#1C2B35] tracking-tight">Inventario Betr Media</h1>
           <p className="text-[#8D8D8D] text-sm mt-1">Inicia sesión para continuar</p>
         </div>
 
@@ -67,7 +67,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
         </div>
 
         <p className="text-center text-xs text-[#8D8D8D] mt-10">
-          Betrmedia SAS · Sistema de Inventario
+          Betrmedia SAS · 2026 ©️
         </p>
       </div>
     </div>
