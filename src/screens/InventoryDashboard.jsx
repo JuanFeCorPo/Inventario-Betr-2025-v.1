@@ -194,7 +194,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             />
             <div className="border-l border-[#E8EAED] pl-3 min-w-0">
               <h1 className="text-sm sm:text-base font-bold text-[#1C2B35] leading-tight truncate">
-                Sistema de Inventario
+                Sistema de Inventario Betr Media 
               </h1>
               <p className="text-xs text-[#8D8D8D] truncate hidden sm:block">
                 {user.email} · <span className="text-[#E68E00] font-medium">{user.role}</span>
