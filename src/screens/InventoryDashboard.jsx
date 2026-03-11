@@ -264,14 +264,11 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                 options={['Activos','Disponible','En Uso','En Mantenimiento','Fuera de Servicio','De Baja','Todos']} />
               {filterCategory !== 'Todos' && (
                 <span className="text-xs text-[#5E6A74] bg-[#F0F2F4] border border-[#E8EAED] px-3 py-2.5 rounded-xl whitespace-nowrap">
-                  {filterCategory}: <span className="font-bold text-[#E68E00]">{categoryCount}</span>
+                  <span className="font-bold text-[#E68E00]">{categoryCount}</span>
                 </span>
               )}
             </div>
 
-            <span className="ml-auto text-xs text-[#8D8D8D] hidden sm:block whitespace-nowrap">
-              {filteredItems.length} equipo{filteredItems.length !== 1 ? 's' : ''}
-            </span>
           </div>
 
           {/* Filtros expandibles en móvil */}
