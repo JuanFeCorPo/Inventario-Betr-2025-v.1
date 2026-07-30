@@ -22,4 +22,5 @@ export const ESTADO_STYLES = {
 
 export const LOGO_URL      = 'https://i.postimg.cc/L6hypBbp/128x128.png';
 export const LOGO_FALLBACK = 'https://placehold.co/128x128/5E6A74/FFFFFF?text=B';
-export const IDLE_TIME_MS  = 900_000;
+export const IDLE_TIME_MS    = 900_000;
+export const IDLE_WARNING_MS = 20_000;

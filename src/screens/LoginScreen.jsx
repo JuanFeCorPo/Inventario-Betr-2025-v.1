@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { LogIn, ShieldX } from 'lucide-react';
 import { LOGO_URL, LOGO_FALLBACK } from '../config/constants';
 
@@ -20,12 +20,12 @@ const LoginScreen = ({ onLogin, accessError }) => {
     }
   };
 
-  const inputClass = 'w-full bg-[#F0F2F4] border border-[#E8EAED] text-[#1C2B35] placeholder-[#8D8D8D] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E68E00]/50 focus:border-[#E68E00]/40 transition-all text-sm';
+  const inputClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange/40 transition-all text-sm';
 
   return (
-    <div className="min-h-screen bg-[#F0F2F4] flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#E68E00]/8 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#5E6A74]/8 rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-orange/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-brand-slate/8 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="w-full max-w-sm animate-modal-in relative z-10">
         <div className="text-center mb-8">
@@ -33,8 +33,8 @@ const LoginScreen = ({ onLogin, accessError }) => {
             className="mx-auto h-16 w-auto object-contain mb-5"
             onError={e => { e.target.onerror = null; e.target.src = LOGO_FALLBACK; }}
           />
-          <h1 className="text-2xl font-bold text-[#1C2B35] tracking-tight">Inventario Betr Media</h1>
-          <p className="text-[#8D8D8D] text-sm mt-1">Inicia sesión para continuar</p>
+          <h1 className="text-2xl font-bold text-brand-ink tracking-tight">Inventario Betr Media</h1>
+          <p className="text-brand-gray text-sm mt-1">Inicia sesión para continuar</p>
         </div>
 
         {/* Error de acceso denegado (viene de App.jsx) */}
@@ -45,7 +45,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
           </div>
         )}
 
-        <div className="bg-white border border-[#E8EAED] rounded-2xl p-8 shadow-xl shadow-[#1C2B35]/5">
+        <div className="bg-white border border-brand-border rounded-2xl p-8 shadow-xl shadow-brand-ink/5">
           <form onSubmit={handleLogin} className="space-y-4">
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="Correo electrónico" className={inputClass} required />
@@ -59,14 +59,14 @@ const LoginScreen = ({ onLogin, accessError }) => {
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-[#E68E00] hover:bg-[#EDAA00] disabled:bg-[#8D8D8D] text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-[#E68E00]/30 mt-2">
+              className="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-brand-amber disabled:bg-brand-gray text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-brand-orange/30 mt-2">
               <LogIn size={16} />
               {loading ? 'Verificando…' : 'Ingresar'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-[#8D8D8D] mt-10">
+        <p className="text-center text-xs text-brand-gray mt-10">
           Betrmedia SAS · 2026 ©️
         </p>
       </div>

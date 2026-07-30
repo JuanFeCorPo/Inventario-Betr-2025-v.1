@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
   signOut, setPersistence, browserSessionPersistence,
@@ -65,6 +65,8 @@ export default function App() {
     });
 
     return unsub;
+    // `loading` se lee solo para evitar un setState redundante; no debe re-disparar el efecto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, db]);
 
   const handleLogin = async (email, password) => {
@@ -78,8 +80,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F0F2F4] flex justify-center items-center">
-        <div className="w-8 h-8 border-2 border-[#E68E00]/30 border-t-[#E68E00] rounded-full animate-spin" />
+      <div className="min-h-screen bg-brand-bg flex justify-center items-center">
+        <div className="w-8 h-8 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
       </div>
     );
   }

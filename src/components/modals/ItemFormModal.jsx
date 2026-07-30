@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { Modal, Button } from '../ui';
 import { CATEGORIAS, ESTADOS } from '../../config/constants';
 
-const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => {
+const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [] }) => {
   const [item, setItem] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const f = 'bg-[#F0F2F4] border border-[#E8EAED] text-[#1C2B35] placeholder-[#8D8D8D] p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E68E00]/50 transition-all w-full';
+  const f = 'bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all w-full';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -21,10 +21,21 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem }) => {
 
   const handleChange = e => setItem(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
+  const findDuplicate = (field, label) => {
+    const value = item[field]?.trim();
+    if (!value) return null;
+    const dup = items.find(i => i.id !== currentItem?.id && i[field]?.trim().toLowerCase() === value.toLowerCase());
+    return dup ? `Ya existe un equipo con ese ${label} (${dup.nombre}).` : null;
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
+
+    const dupError = findDuplicate('numeroInventario', 'número de inventario') || findDuplicate('numeroSerial', 'número de serial');
+    if (dupError) { setError(dupError); return; }
+
+    setSaving(true);
     try {
       const data = { ...item };
       if (data.fechaIngreso) data.fechaIngreso = Timestamp.fromDate(new Date(data.fechaIngreso));

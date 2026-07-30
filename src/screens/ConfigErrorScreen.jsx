@@ -2,7 +2,6 @@
 //  src/screens/ConfigErrorScreen.jsx
 // ─────────────────────────────────────────────
 
-import React from 'react';
 import { ServerCrash } from 'lucide-react';
 
 const ConfigErrorScreen = () => (

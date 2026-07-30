@@ -10,6 +10,9 @@ export default {
           yellow:  '#F4DB44',
           slate:   '#5E6A74',
           gray:    '#8D8D8D',
+          ink:     '#1C2B35',
+          bg:      '#F0F2F4',
+          border:  '#E8EAED',
         },
       },
       fontFamily: {

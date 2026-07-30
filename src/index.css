@@ -5,24 +5,12 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --brand-orange:  #E68E00;
-  --brand-amber:   #EDAA00;
-  --brand-yellow:  #F4DB44;
-  --brand-slate:   #5E6A74;
-  --brand-gray:    #8D8D8D;
-  --bg-base:       #cccccc;
-  --bg-surface:    #FFFFFF;
-  --text-primary:  #1C2B35;
-  --text-secondary:#5E6A74;
-  --text-muted:    #8D8D8D;
-}
+/* Los colores de marca viven en tailwind.config.js (theme.extend.colors.brand) — única fuente de verdad. */
 
 body {
   font-family: 'Greycliff CF', 'Inter', system-ui, sans-serif;
-  background-color: var(--bg-base);
-  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  @apply bg-brand-bg text-brand-ink;
 }
 
 @layer utilities {

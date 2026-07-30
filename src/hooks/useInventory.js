@@ -7,9 +7,9 @@
 import { useState, useEffect } from 'react';
 import {
   collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, query, Timestamp, arrayUnion,
+  onSnapshot, query, Timestamp, arrayUnion, writeBatch,
 } from 'firebase/firestore';
-import { EQUIPOS_PATH } from '../config/firebase';
+import { EQUIPOS_PATH, EQUIPOS_ELIMINADOS_PATH } from '../config/firebase';
 
 const useInventory = (db, user) => {
   const [items, setItems]     = useState([]);
@@ -82,12 +82,42 @@ const useInventory = (db, user) => {
     });
   };
 
-  // ── Eliminar ─────────────────────────────────
-  const deleteItem = async (id) => {
-    await deleteDoc(doc(db, EQUIPOS_PATH, id));
+  // ── Importar en lote desde Excel ─────────────
+  const importItems = async (rows) => {
+    const BATCH_SIZE = 450; // margen bajo el límite de 500 operaciones/lote de Firestore
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      rows.slice(i, i + BATCH_SIZE).forEach(row => {
+        const entry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo importado desde Excel.' };
+        const ref = doc(collection(db, EQUIPOS_PATH));
+        batch.set(ref, {
+          ...row,
+          fechaIngreso: Timestamp.fromDate(new Date(row.fechaIngreso)),
+          addedBy: user.uid,
+          createdAt: Timestamp.now(),
+          history: [entry],
+        });
+      });
+      await batch.commit();
+    }
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem };
+  // ── Eliminar (queda registro en equipos_eliminados) ──
+  const deleteItem = async (id) => {
+    const ref  = doc(db, EQUIPOS_PATH, id);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await addDoc(collection(db, EQUIPOS_ELIMINADOS_PATH), {
+        ...snap.data(),
+        originalId: id,
+        deletedBy: user.email,
+        deletedAt: Timestamp.now(),
+      });
+    }
+    await deleteDoc(ref);
+  };
+
+  return { items, loading, saveItem, deactivateItem, deleteItem, importItems };
 };
 
 export default useInventory;
