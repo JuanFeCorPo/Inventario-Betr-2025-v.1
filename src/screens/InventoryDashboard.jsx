@@ -23,16 +23,16 @@ const EquipoRow = ({ item, onAction }) => (
   <tr className="border-b border-brand-border hover:bg-brand-bg/60 transition-colors cursor-pointer"
     onClick={() => onAction('preview', item)}>
     <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm min-w-[160px]">{item.nombre}</td>
-    <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono whitespace-nowrap">{item.numeroSerial || '—'}</td>
-    <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
     <td className="px-4 py-3.5 text-center">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
         <StatusBadge status={item.estado} />
         {item.condicion === 'Nuevo' && <NewBadge />}
       </div>
     </td>
+    <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
+    <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono whitespace-nowrap">{item.numeroSerial || '—'}</td>
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
     <td className="px-4 py-3.5 text-center" aria-label={`Ver detalle de ${item.nombre}`}>
       <Eye size={15} className="text-brand-gray inline-block" />
     </td>
@@ -300,10 +300,11 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
-                  {['Nombre','Nº Inv','Serial','Categoría','Encargado','Estado',''].map((h, i) => {
-                    const responsive = { 2: 'hidden lg:table-cell', 4: 'hidden lg:table-cell' }[i] ?? '';
+                  {['Nombre','Estado','Nº Inv','Categoría','Serial','Encargado',''].map((h, i) => {
+                    const responsive = { 4: 'hidden lg:table-cell', 5: 'hidden lg:table-cell' }[i] ?? '';
+                    const center     = (i === 1 || i === 6) ? 'text-center' : '';
                     return (
-                      <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${i >= 5 ? 'text-center' : ''} ${responsive}`}>
+                      <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${center} ${responsive}`}>
                         {h}
                       </th>
                     );
