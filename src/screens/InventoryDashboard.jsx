@@ -232,7 +232,8 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             />
             <div className="border-l border-brand-border pl-3 min-w-0">
               <h1 className="text-sm sm:text-base font-bold text-brand-ink leading-tight truncate">
-                Sistema de Inventario Betr Media
+                <span className="sm:hidden">Inventario Betr Media</span>
+                <span className="hidden sm:inline">Sistema de Inventario Betr Media</span>
               </h1>
               <p className="text-xs text-brand-gray truncate hidden sm:block">
                 {user.email} · <span className="text-brand-orange font-medium">{user.role}</span>
@@ -273,7 +274,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </header>
 
         {/* ── Stat Cards ─────────────────────── */}
-        <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
           <StatCard title="Activos"      value={stats.total}           icon={<Box size={16} className="text-brand-orange"/>}          accent="bg-brand-orange/10"  onClick={() => setFilterStatus('Activos')} />
           <StatCard title="Disponibles"  value={stats.disponibles}     icon={<CheckCircle size={16} className="text-emerald-600"/>} accent="bg-emerald-50"    onClick={() => setFilterStatus('Disponible')} />
           <StatCard title="En Uso"       value={stats.enUso}           icon={<Users size={16} className="text-amber-600"/>}         accent="bg-amber-50"      onClick={() => setFilterStatus('En Uso')} />
