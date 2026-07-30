@@ -16,9 +16,9 @@ export default {
         },
       },
       fontFamily: {
-        sans:    ['Greycliff CF', 'SF Pro Text', 'system-ui', 'sans-serif'],
-        display: ['Greycliff CF', 'sans-serif'],
-        body:    ['SF Pro Text', 'system-ui', 'sans-serif'],
+        sans:    ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        body:    ['Inter', 'system-ui', 'sans-serif'],
       },
     },
   },
