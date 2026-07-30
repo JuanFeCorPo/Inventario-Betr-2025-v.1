@@ -217,14 +217,14 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </div>
 
         {/* ── Contenido + barra lateral del gráfico ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
+        <div className="grid grid-cols-1 2xl:grid-cols-[1fr_300px] gap-4 items-start">
 
-        {/* Gráfico: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas anchas */}
-        <div className="xl:col-start-2 xl:row-start-1">
+        {/* Gráfico: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas muy anchas */}
+        <div className="2xl:col-start-2 2xl:row-start-1">
           <CategoryChart items={items} onSelectCategory={(categoria) => { setFilterCategory(categoria); setFilterStatus('Todos'); }} />
         </div>
 
-        <div className="xl:col-start-1 xl:row-start-1 min-w-0">
+        <div className="2xl:col-start-1 2xl:row-start-1 min-w-0">
 
         {/* ── Filtros ────────────────────────── */}
         <div className="bg-white border border-brand-border rounded-2xl p-3 sm:p-4 mb-4 shadow-sm">
