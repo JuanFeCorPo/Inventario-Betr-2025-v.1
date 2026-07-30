@@ -24,12 +24,12 @@ const EquipoRow = ({ item, onAction }) => (
     onClick={() => onAction('preview', item)}>
     <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm">{item.nombre}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono">{item.numeroInventario}</td>
-    <td className="px-4 py-3.5 text-brand-gray text-xs font-mono">{item.numeroSerial || '—'}</td>
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono">{item.numeroSerial || '—'}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm">{item.categoria}</td>
-    <td className="px-4 py-3.5 text-brand-slate text-xs max-w-[180px] truncate" title={item.observaciones}>
+    <td className="hidden 2xl:table-cell px-4 py-3.5 text-brand-slate text-xs max-w-[180px] truncate" title={item.observaciones}>
       {item.observaciones || <span className="text-brand-gray italic">Sin observaciones</span>}
     </td>
-    <td className="px-4 py-3.5 text-brand-slate text-sm">{item.personaEncargada || '—'}</td>
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm">{item.personaEncargada || '—'}</td>
     <td className="px-4 py-3.5 text-center">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
         <StatusBadge status={item.estado} />
@@ -303,11 +303,14 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
-                  {['Nombre','Nº Inv','Serial','Categoría','Observaciones','Encargado','Estado',''].map((h, i) => (
-                    <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${i >= 6 ? 'text-center' : ''}`}>
-                      {h}
-                    </th>
-                  ))}
+                  {['Nombre','Nº Inv','Serial','Categoría','Observaciones','Encargado','Estado',''].map((h, i) => {
+                    const responsive = { 2: 'hidden lg:table-cell', 4: 'hidden 2xl:table-cell', 5: 'hidden lg:table-cell' }[i] ?? '';
+                    return (
+                      <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${i >= 6 ? 'text-center' : ''} ${responsive}`}>
+                        {h}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
