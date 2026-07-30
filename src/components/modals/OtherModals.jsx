@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button } from '../ui';
+import HistoryTimeline from '../HistoryTimeline';
 
 const fieldClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all';
 
@@ -31,48 +32,33 @@ export const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
   );
 };
 
-export const HistoryModal = ({ isOpen, onClose, item }) => {
-  const sorted = useMemo(() => {
-    if (!item?.history) return [];
-    return [...item.history].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-  }, [item]);
+export const HistoryModal = ({ isOpen, onClose, item }) => (
+  <Modal isOpen={isOpen} onClose={onClose} title={`Historial — ${item?.nombre ?? ''}`} size="md">
+    <div className="max-h-[60vh] overflow-y-auto pr-1">
+      <HistoryTimeline history={item?.history} />
+    </div>
+  </Modal>
+);
+
+export const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => {
+  const [confirmText, setConfirmText] = useState('');
+  useEffect(() => { if (isOpen) setConfirmText(''); }, [isOpen]);
+  const matches = confirmText.trim().toLowerCase() === (itemName ?? '').trim().toLowerCase();
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Historial — ${item?.nombre ?? ''}`} size="md">
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-        {sorted.length === 0 ? (
-          <p className="text-center italic text-brand-gray py-8">Sin historial de modificaciones.</p>
-        ) : sorted.map((entry, i) => (
-          <div key={i} className="bg-brand-bg border border-brand-border p-4 rounded-xl">
-            <p className="font-medium text-brand-ink whitespace-pre-line text-sm">{entry.action}</p>
-            {entry.fechaBaja && <p className="text-xs text-brand-slate mt-1">Fecha de baja: {entry.fechaBaja.toDate().toLocaleDateString()}</p>}
-            {entry.changes?.length > 0 && (
-              <ul className="mt-2 space-y-0.5 text-xs">
-                {entry.changes.map((c, j) => (
-                  <li key={j}><span className="capitalize text-brand-slate font-medium">{c.field}:</span>{' '}
-                    <span className="text-rose-500">'{c.from}'</span> → <span className="text-emerald-600">'{c.to}'</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-xs text-brand-gray mt-2 text-right">
-              {entry.timestamp?.toDate().toLocaleString()} · <span className="text-brand-orange font-medium">{entry.user}</span>
-            </p>
-          </div>
-        ))}
+    <Modal isOpen={isOpen} onClose={onClose} title="Eliminar equipo" size="sm">
+      <div className="space-y-4">
+        <p className="text-rose-500 font-medium">Esta acción es irreversible.</p>
+        <p className="text-brand-slate text-sm">
+          Para confirmar, escribe el nombre exacto: <span className="font-bold text-brand-ink">{itemName}</span>
+        </p>
+        <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
+          placeholder="Escribe el nombre del equipo" className={fieldClass} />
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="danger" onClick={onConfirm} disabled={!matches}>Sí, Eliminar</Button>
+        </div>
       </div>
     </Modal>
   );
 };
-
-export const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => (
-  <Modal isOpen={isOpen} onClose={onClose} title="Eliminar equipo" size="sm">
-    <div className="space-y-4">
-      <p className="text-rose-500 font-medium">Esta acción es irreversible.</p>
-      <p className="text-brand-slate text-sm">¿Eliminar permanentemente <span className="font-bold text-brand-ink">{itemName}</span>?</p>
-      <div className="flex justify-end gap-3 pt-2">
-        <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button variant="danger" onClick={onConfirm}>Sí, Eliminar</Button>
-      </div>
-    </div>
-  </Modal>
-);

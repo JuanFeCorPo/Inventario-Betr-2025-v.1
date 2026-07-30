@@ -1,10 +1,11 @@
 import * as XLSX from 'xlsx';
-import { CATEGORIAS, ESTADOS } from '../config/constants';
+import { CATEGORIAS, ESTADOS, CONDICIONES } from '../config/constants';
 
 export const COLUMNS = [
   { key: 'nombre',           label: 'Nombre' },
   { key: 'categoria',        label: 'Categoría' },
   { key: 'estado',           label: 'Estado' },
+  { key: 'condicion',        label: 'Condición' },
   { key: 'numeroInventario', label: 'N° Inventario' },
   { key: 'numeroSerial',     label: 'N° Serial' },
   { key: 'fechaIngreso',     label: 'Fecha de Ingreso' },
@@ -40,6 +41,7 @@ export function exportInventory(items) {
     'Nombre': item.nombre ?? '',
     'Categoría': item.categoria ?? '',
     'Estado': item.estado ?? '',
+    'Condición': item.condicion ?? 'Usado',
     'N° Inventario': item.numeroInventario ?? '',
     'N° Serial': item.numeroSerial ?? '',
     'Fecha de Ingreso': item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toISOString().split('T')[0] : '',
@@ -52,15 +54,50 @@ export function exportInventory(items) {
   ws['!cols'] = COLUMNS.map(() => ({ wch: 22 }));
   XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
 
-  const refRows = Array.from({ length: Math.max(CATEGORIAS.length, ESTADOS.length) }, (_, i) => ({
+  const refRows = Array.from({ length: Math.max(CATEGORIAS.length, ESTADOS.length, CONDICIONES.length) }, (_, i) => ({
     'Categorías válidas': CATEGORIAS[i] ?? '',
     'Estados válidos': ESTADOS[i] ?? '',
+    'Condiciones válidas': CONDICIONES[i] ?? '',
   }));
   const wsRef = XLSX.utils.json_to_sheet(refRows);
-  wsRef['!cols'] = [{ wch: 24 }, { wch: 20 }];
+  wsRef['!cols'] = [{ wch: 24 }, { wch: 20 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, wsRef, 'Referencia');
 
   XLSX.writeFile(wb, `inventario_betrmedia_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ── Exportar historial de un equipo individual ─
+export function exportItemHistory(item) {
+  const wb = XLSX.utils.book_new();
+
+  const infoRows = [
+    { Campo: 'Nombre',            Valor: item.nombre ?? '' },
+    { Campo: 'Categoría',         Valor: item.categoria ?? '' },
+    { Campo: 'Estado',            Valor: item.estado ?? '' },
+    { Campo: 'Condición',         Valor: item.condicion ?? 'Usado' },
+    { Campo: 'N° Inventario',     Valor: item.numeroInventario ?? '' },
+    { Campo: 'N° Serial',         Valor: item.numeroSerial ?? '' },
+    { Campo: 'Fecha de Ingreso',  Valor: item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toISOString().split('T')[0] : '' },
+    { Campo: 'Persona Encargada', Valor: item.personaEncargada ?? '' },
+    { Campo: 'Observaciones',     Valor: item.observaciones ?? '' },
+  ];
+  const wsInfo = XLSX.utils.json_to_sheet(infoRows);
+  wsInfo['!cols'] = [{ wch: 20 }, { wch: 45 }];
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'Datos');
+
+  const sorted = [...(item.history ?? [])].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+  const historyRows = sorted.map(h => ({
+    'Fecha':   h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString() : '',
+    'Usuario': h.user ?? '',
+    'Acción':  h.action ?? '',
+    'Cambios': (h.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | '),
+  }));
+  const wsHist = XLSX.utils.json_to_sheet(historyRows.length ? historyRows : [{ Fecha: '', Usuario: '', 'Acción': 'Sin historial', Cambios: '' }]);
+  wsHist['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 45 }, { wch: 55 }];
+  XLSX.utils.book_append_sheet(wb, wsHist, 'Historial');
+
+  const safeName = (item.numeroInventario || item.nombre || 'equipo').toString().replace(/[^a-z0-9]/gi, '_');
+  XLSX.writeFile(wb, `equipo_${safeName}.xlsx`);
 }
 
 // ── Importar ──────────────────────────────────
@@ -68,6 +105,7 @@ const HEADER_MAP = {
   nombre: ['nombre'],
   categoria: ['categoria'],
   estado: ['estado'],
+  condicion: ['condicion'],
   numeroInventario: ['n inventario', 'numero inventario', 'no inventario'],
   numeroSerial: ['n serial', 'numero serial', 'serial'],
   fechaIngreso: ['fecha de ingreso', 'fecha ingreso', 'fecha'],
@@ -105,6 +143,15 @@ function parseRow(row, index) {
     if (rawEstado) warnings.push(`Estado "${rawEstado}" no reconocido, se usó "Disponible".`);
   }
 
+  const rawCondicion = findField(row, 'condicion');
+  let condicion = matchFromList(rawCondicion, CONDICIONES);
+  if (!condicion) {
+    // Sin dato -> se asume "Usado" (más seguro que marcar como Nuevo algo que no se sabe).
+    condicion = 'Usado';
+    if (rawCondicion) warnings.push(`Condición "${rawCondicion}" no reconocida, se usó "Usado".`);
+  }
+  if (condicion === 'Nuevo' && estado === 'En Uso') condicion = 'Usado';
+
   const fechaIngreso = excelDateToISO(findField(row, 'fechaIngreso'));
 
   if (!nombre) errors.push('Falta el nombre.');
@@ -113,7 +160,7 @@ function parseRow(row, index) {
 
   return {
     _row: index + 2,
-    nombre, categoria, estado, numeroInventario, numeroSerial,
+    nombre, categoria, estado, condicion, numeroInventario, numeroSerial,
     fechaIngreso, personaEncargada, observaciones,
     errors, warnings,
   };

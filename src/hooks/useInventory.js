@@ -31,8 +31,15 @@ const useInventory = (db, user) => {
   }, [db]);
 
   // ── Crear / Editar equipo ────────────────────
-  const saveItem = async (itemData) => {
+  const saveItem = async (itemData, motivoEstado) => {
     const { id, ...data } = itemData;
+
+    // Un equipo deja de considerarse "Nuevo" en cuanto se asigna a alguien,
+    // aunque luego vuelva a quedar "Disponible" (ej. renuncia de un colaborador).
+    if (data.estado === 'En Uso' && data.condicion === 'Nuevo') {
+      data.condicion = 'Usado';
+    }
+
     if (id) {
       const ref      = doc(db, EQUIPOS_PATH, id);
       const snap     = await getDoc(ref);
@@ -51,7 +58,11 @@ const useInventory = (db, user) => {
         }
       }
 
-      const entry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo modificado.', changes };
+      let action = 'Equipo modificado.';
+      if (motivoEstado?.trim() && changes.some(c => c.field === 'estado')) {
+        action += `\nMotivo del cambio de estado: ${motivoEstado.trim()}`;
+      }
+      const entry = { timestamp: Timestamp.now(), user: user.email, action, changes };
       await updateDoc(ref, { ...data, history: arrayUnion(entry) });
     } else {
       const entry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo creado en el inventario.' };
@@ -80,6 +91,12 @@ const useInventory = (db, user) => {
       motivo_baja: reason,
       history: arrayUnion(entry),
     });
+  };
+
+  // ── Agregar nota (no toca observaciones) ─────
+  const addNote = async (id, note) => {
+    const entry = { timestamp: Timestamp.now(), user: user.email, action: `Nota: ${note}` };
+    await updateDoc(doc(db, EQUIPOS_PATH, id), { history: arrayUnion(entry) });
   };
 
   // ── Importar en lote desde Excel ─────────────
@@ -117,7 +134,7 @@ const useInventory = (db, user) => {
     await deleteDoc(ref);
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, importItems };
+  return { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote };
 };
 
 export default useInventory;

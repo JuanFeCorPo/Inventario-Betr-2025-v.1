@@ -1,22 +1,27 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { StatCard, StatusBadge, Dropdown } from '../components/ui';
+import { StatCard, StatusBadge, NewBadge, Dropdown } from '../components/ui';
 import {
-  CheckCircle, PlusCircle, AlertTriangle, Edit, Trash2,
-  Box, Users, Archive, LogOut, History, X, Wrench, Search,
-  ChevronDown, ChevronUp, Menu, Download, Upload, MoreVertical
+  CheckCircle, PlusCircle, AlertTriangle,
+  Box, Users, Archive, LogOut, Eye, X, Wrench, Search,
+  Menu, Download, Upload, MoreVertical
 } from 'lucide-react';
 import IdleModal     from '../components/modals/IdleModal';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
-import { DeactivateModal, HistoryModal, DeleteConfirmModal } from '../components/modals/OtherModals';
+import PreviewModal  from '../components/modals/PreviewModal';
+import { DeactivateModal, DeleteConfirmModal } from '../components/modals/OtherModals';
 import useIdleTimeout from '../hooks/useIdleTimeout';
 import useInventory   from '../hooks/useInventory';
 import { LOGO_URL, LOGO_FALLBACK, IDLE_TIME_MS, IDLE_WARNING_MS } from '../config/constants';
 import { exportInventory } from '../utils/excel';
+import { computeAlerts } from '../utils/alerts';
+import AlertsBanner  from '../components/AlertsBanner';
+import CategoryChart from '../components/CategoryChart';
 
 // ── Fila de tabla (desktop) ──────────────────
-const EquipoRow = ({ item, isAdmin, onAction }) => (
-  <tr className="border-b border-brand-border hover:bg-brand-bg/60 transition-colors group">
+const EquipoRow = ({ item, onAction }) => (
+  <tr className="border-b border-brand-border hover:bg-brand-bg/60 transition-colors cursor-pointer"
+    onClick={() => onAction('preview', item)}>
     <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm">{item.nombre}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono">{item.numeroInventario}</td>
     <td className="px-4 py-3.5 text-brand-gray text-xs font-mono">{item.numeroSerial || '—'}</td>
@@ -25,114 +30,35 @@ const EquipoRow = ({ item, isAdmin, onAction }) => (
       {item.observaciones || <span className="text-brand-gray italic">Sin observaciones</span>}
     </td>
     <td className="px-4 py-3.5 text-brand-slate text-sm">{item.personaEncargada || '—'}</td>
-    <td className="px-4 py-3.5"><StatusBadge status={item.estado} /></td>
-    <td className="px-4 py-3.5">
-      <div className="flex items-center justify-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onAction('history', item)} aria-label={`Ver historial de ${item.nombre}`}
-          className="text-brand-slate hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-all" title="Historial">
-          <History size={15} />
-        </button>
-        {isAdmin && (<>
-          <button onClick={() => onAction('edit', item)} aria-label={`Editar ${item.nombre}`}
-            className="text-brand-slate hover:text-brand-orange p-1.5 rounded-lg hover:bg-brand-orange/10 transition-all" title="Editar">
-            <Edit size={15} />
-          </button>
-          {item.estado !== 'De Baja' && (
-            <button onClick={() => onAction('deactivate', item)} aria-label={`Dar de baja ${item.nombre}`}
-              className="text-brand-slate hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition-all" title="Dar de baja">
-              <Archive size={15} />
-            </button>
-          )}
-          <button onClick={() => onAction('delete', item)} aria-label={`Eliminar ${item.nombre}`}
-            className="text-brand-slate hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-all" title="Eliminar">
-            <Trash2 size={15} />
-          </button>
-        </>)}
+    <td className="px-4 py-3.5 text-center">
+      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+        <StatusBadge status={item.estado} />
+        {item.condicion === 'Nuevo' && <NewBadge />}
       </div>
+    </td>
+    <td className="px-4 py-3.5 text-center" aria-label={`Ver detalle de ${item.nombre}`}>
+      <Eye size={15} className="text-brand-gray inline-block" />
     </td>
   </tr>
 );
 
-// ── Tarjeta móvil expandible ─────────────────
-const EquipoCard = ({ item, isAdmin, onAction }) => {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="bg-white border border-brand-border rounded-xl overflow-hidden shadow-sm">
-      {/* Cabecera siempre visible */}
-      <button
-        onClick={() => setExpanded(p => !p)}
-        className="w-full flex items-center justify-between px-4 py-3.5 text-left hover:bg-brand-bg/50 transition-colors"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <StatusBadge status={item.estado} />
-          <div className="min-w-0">
-            <p className="font-semibold text-brand-ink text-sm truncate">{item.nombre}</p>
-            <p className="text-xs text-brand-gray font-mono">{item.numeroInventario}</p>
-          </div>
-        </div>
-        {expanded
-          ? <ChevronUp size={16} className="text-brand-gray flex-shrink-0" />
-          : <ChevronDown size={16} className="text-brand-gray flex-shrink-0" />
-        }
-      </button>
-
-      {/* Detalles expandibles */}
-      {expanded && (
-        <div className="border-t border-brand-border px-4 py-4 space-y-3 bg-brand-bg/30">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-brand-gray mb-0.5">Categoría</p>
-              <p className="text-brand-ink font-medium">{item.categoria || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-gray mb-0.5">Serial</p>
-              <p className="text-brand-slate font-mono text-xs">{item.numeroSerial || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-gray mb-0.5">Encargado</p>
-              <p className="text-brand-ink">{item.personaEncargada || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-brand-gray mb-0.5">Estado</p>
-              <StatusBadge status={item.estado} />
-            </div>
-          </div>
-
-          {item.observaciones && (
-            <div>
-              <p className="text-xs text-brand-gray mb-0.5">Observaciones</p>
-              <p className="text-brand-slate text-sm">{item.observaciones}</p>
-            </div>
-          )}
-
-          {/* Acciones */}
-          <div className="flex items-center gap-2 pt-1 border-t border-brand-border">
-            <button onClick={() => onAction('history', item)}
-              className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-medium transition-colors hover:bg-blue-100">
-              <History size={13} /> Historial
-            </button>
-            {isAdmin && (<>
-              <button onClick={() => onAction('edit', item)}
-                className="flex items-center gap-1.5 text-xs text-brand-orange bg-brand-orange/10 px-3 py-2 rounded-lg font-medium transition-colors hover:bg-brand-orange/20">
-                <Edit size={13} /> Editar
-              </button>
-              {item.estado !== 'De Baja' && (
-                <button onClick={() => onAction('deactivate', item)}
-                  className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg font-medium transition-colors hover:bg-amber-100">
-                  <Archive size={13} /> Baja
-                </button>
-              )}
-              <button onClick={() => onAction('delete', item)}
-                className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 px-3 py-2 rounded-lg font-medium transition-colors hover:bg-rose-100 ml-auto">
-                <Trash2 size={13} /> Eliminar
-              </button>
-            </>)}
-          </div>
-        </div>
-      )}
+// ── Tarjeta móvil ─────────────────────────────
+const EquipoCard = ({ item, onAction }) => (
+  <button onClick={() => onAction('preview', item)}
+    className="w-full flex items-center justify-between px-4 py-3.5 text-left bg-white border border-brand-border rounded-xl shadow-sm hover:bg-brand-bg/50 transition-colors">
+    <div className="flex items-center gap-3 min-w-0">
+      <div className="flex flex-col items-start gap-1 flex-shrink-0">
+        <StatusBadge status={item.estado} />
+        {item.condicion === 'Nuevo' && <NewBadge />}
+      </div>
+      <div className="min-w-0">
+        <p className="font-semibold text-brand-ink text-sm truncate">{item.nombre}</p>
+        <p className="text-xs text-brand-gray font-mono">{item.numeroInventario}</p>
+      </div>
     </div>
-  );
-};
+    <Eye size={16} className="text-brand-gray flex-shrink-0" />
+  </button>
+);
 
 // ── Menú de más opciones (móvil) ──────────────
 const MobileMenu = ({ isAdmin, onUsers, onExport, onImport }) => {
@@ -172,7 +98,7 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport }) => {
 // ── Dashboard principal ──────────────────────
 const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const isAdmin = user.role === 'Administrador';
-  const { items, loading, saveItem, deactivateItem, deleteItem, importItems } = useInventory(db, user);
+  const { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote } = useInventory(db, user);
   const [modal,          setModal]          = useState({ type: null, data: null });
   const [showImport,     setShowImport]     = useState(false);
   const [searchTerm,     setSearchTerm]     = useState('');
@@ -183,7 +109,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
   const openModal  = (type, data = null) => setModal({ type, data });
   const closeModal = () => setModal({ type: null, data: null });
-  const handleSave = async (data) => { await saveItem(data); closeModal(); };
+  const handleSave = async (data, motivoEstado) => { await saveItem(data, motivoEstado); closeModal(); };
   const handleDeactivate = async (reason, fecha) => { await deactivateItem(modal.data.id, reason, fecha); closeModal(); };
   const handleDelete     = async ()              => { await deleteItem(modal.data.id); closeModal(); };
 
@@ -198,6 +124,13 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
       deBaja: items.filter(i => i.estado === 'De Baja').length,
     };
   }, [items]);
+
+  const alerts = useMemo(() => computeAlerts(items), [items]);
+
+  const goToAlert = (alert) => {
+    setFilterCategory(alert.filterCategory ?? 'Todos');
+    setFilterStatus(alert.filterStatus ?? 'Todos');
+  };
 
   const categorias = useMemo(() => ['Todos', ...new Set(items.map(i => i.categoria))], [items]);
 
@@ -273,6 +206,9 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
           </div>
         </header>
 
+        {/* ── Alertas inteligentes ───────────── */}
+        <AlertsBanner alerts={alerts} onGoTo={goToAlert} />
+
         {/* ── Stat Cards ─────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
           <StatCard title="Activos"      value={stats.total}           icon={<Box size={16} className="text-brand-orange"/>}          accent="bg-brand-orange/10"  onClick={() => setFilterStatus('Activos')} />
@@ -282,6 +218,16 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
           <StatCard title="F. Servicio"  value={stats.fueraServicio}   icon={<AlertTriangle size={16} className="text-rose-500"/>}  accent="bg-rose-50"       onClick={() => setFilterStatus('Fuera de Servicio')} />
           <StatCard title="De Baja"      value={stats.deBaja}          icon={<Archive size={16} className="text-brand-gray"/>}       accent="bg-brand-gray/10"  onClick={() => setFilterStatus('De Baja')} />
         </div>
+
+        {/* ── Contenido + barra lateral del gráfico ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4 items-start">
+
+        {/* Gráfico: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas anchas */}
+        <div className="xl:col-start-2 xl:row-start-1">
+          <CategoryChart items={items} onSelectCategory={(categoria) => { setFilterCategory(categoria); setFilterStatus('Todos'); }} />
+        </div>
+
+        <div className="xl:col-start-1 xl:row-start-1 min-w-0">
 
         {/* ── Filtros ────────────────────────── */}
         <div className="bg-white border border-brand-border rounded-2xl p-3 sm:p-4 mb-4 shadow-sm">
@@ -347,7 +293,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               No se encontraron equipos con los filtros actuales.
             </p>
           ) : filteredItems.map(item => (
-            <EquipoCard key={item.id} item={item} isAdmin={isAdmin} onAction={openModal} />
+            <EquipoCard key={item.id} item={item} onAction={openModal} />
           ))}
         </div>
 
@@ -357,8 +303,8 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
-                  {['Nombre','Nº Inv','Serial','Categoría','Observaciones','Encargado','Estado','Acciones'].map(h => (
-                    <th key={h} className="px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap">
+                  {['Nombre','Nº Inv','Serial','Categoría','Observaciones','Encargado','Estado',''].map((h, i) => (
+                    <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${i >= 6 ? 'text-center' : ''}`}>
                       {h}
                     </th>
                   ))}
@@ -377,16 +323,24 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                     No se encontraron equipos con los filtros actuales.
                   </td></tr>
                 ) : filteredItems.map(item => (
-                  <EquipoRow key={item.id} item={item} isAdmin={isAdmin} onAction={openModal} />
+                  <EquipoRow key={item.id} item={item} onAction={openModal} />
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+
+        </div>
+        </div>
       </div>
 
       <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={closeModal} onSave={handleSave} currentItem={modal.data} items={items} />
-      <HistoryModal isOpen={modal.type === 'history'} onClose={closeModal} item={modal.data} />
+      <PreviewModal isOpen={modal.type === 'preview'} onClose={closeModal} item={modal.data} isAdmin={isAdmin}
+        onEdit={() => openModal('edit', modal.data)}
+        onDeactivate={() => openModal('deactivate', modal.data)}
+        onDelete={() => openModal('delete', modal.data)}
+        onAddNote={addNote}
+      />
       <DeactivateModal isOpen={modal.type === 'deactivate'} onClose={closeModal} onDeactivate={handleDeactivate} />
       <DeleteConfirmModal isOpen={modal.type === 'delete'} onClose={closeModal} onConfirm={handleDelete} itemName={modal.data?.nombre} />
       {isAdmin && (

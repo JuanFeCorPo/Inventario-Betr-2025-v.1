@@ -115,6 +115,7 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
                   <th className="px-3 py-2">Nombre</th>
                   <th className="px-3 py-2">Categoría</th>
                   <th className="px-3 py-2">Estado</th>
+                  <th className="px-3 py-2">Condición</th>
                   <th className="px-3 py-2">N° Inv.</th>
                   <th className="px-3 py-2">Fecha</th>
                   <th className="px-3 py-2">Notas</th>
@@ -131,6 +132,7 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
                     <td className="px-3 py-2 text-brand-ink font-medium">{row.nombre || '—'}</td>
                     <td className="px-3 py-2 text-brand-slate">{row.categoria}</td>
                     <td className="px-3 py-2 text-brand-slate">{row.estado}</td>
+                    <td className="px-3 py-2 text-brand-slate">{row.condicion}</td>
                     <td className="px-3 py-2 text-brand-slate font-mono">{row.numeroInventario || '—'}</td>
                     <td className="px-3 py-2 text-brand-slate">{row.fechaIngreso || '—'}</td>
                     <td className="px-3 py-2">

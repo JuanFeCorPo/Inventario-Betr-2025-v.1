@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 
 import { useState, useRef, useEffect } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, Sparkles } from 'lucide-react';
 import { ESTADO_STYLES } from '../../config/constants';
 
 // ── Modal base ───────────────────────────────
@@ -12,8 +12,8 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
   const sizes = { sm: 'max-w-md', md: 'max-w-2xl', lg: 'max-w-4xl' };
   return (
-    <div className="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm flex justify-center items-center z-50 animate-modal-in p-4">
-      <div className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizes[size]} relative`}>
+    <div className="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm flex justify-center items-center z-50 animate-modal-in p-4 sm:p-8">
+      <div className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizes[size]} max-h-[85vh] overflow-y-auto relative`}>
         <button onClick={onClose} aria-label="Cerrar"
           className="absolute top-4 right-4 text-brand-gray hover:text-brand-ink transition-colors p-1 rounded-lg hover:bg-brand-bg">
           <X size={20} />
@@ -29,6 +29,13 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 export const StatusBadge = ({ status }) => (
   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${ESTADO_STYLES[status] ?? 'bg-gray-100 text-gray-500'}`}>
     {status}
+  </span>
+);
+
+// ── Badge "Nuevo" — equipo nunca antes asignado ──
+export const NewBadge = () => (
+  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-100 text-blue-700 border border-blue-200">
+    <Sparkles size={10} /> Nuevo
   </span>
 );
 

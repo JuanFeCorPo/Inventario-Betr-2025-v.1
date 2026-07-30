@@ -11,6 +11,10 @@ export const CATEGORIAS = [
 
 export const ESTADOS = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio'];
 
+// Nuevo = nunca ha sido asignado a nadie. Usado = ya tuvo al menos un uso,
+// aunque haya vuelto a quedar "Disponible" (ej. renuncia de un colaborador).
+export const CONDICIONES = ['Nuevo', 'Usado'];
+
 // Badges por estado — fondo suave + texto de color
 export const ESTADO_STYLES = {
   'Disponible':         'bg-emerald-100  text-emerald-700  border border-emerald-200',
