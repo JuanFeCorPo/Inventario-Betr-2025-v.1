@@ -31,8 +31,7 @@ const EquipoRow = ({ item, onAction }) => (
     </td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
-    <td className="hidden 2xl:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono whitespace-nowrap">{item.numeroSerial || '—'}</td>
-    <td className="hidden 2xl:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
     <td className="px-4 py-3.5 text-center" aria-label={`Ver detalle de ${item.nombre}`}>
       <Eye size={15} className="text-brand-gray inline-block" />
     </td>
@@ -300,9 +299,9 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
-                  {['Nombre','Estado','Nº Inv','Categoría','Serial','Encargado',''].map((h, i) => {
-                    const responsive = { 4: 'hidden 2xl:table-cell', 5: 'hidden 2xl:table-cell' }[i] ?? '';
-                    const center     = (i === 1 || i === 6) ? 'text-center' : '';
+                  {['Nombre','Estado','Nº Inv','Categoría','Encargado',''].map((h, i) => {
+                    const responsive = { 4: 'hidden lg:table-cell' }[i] ?? '';
+                    const center     = (i === 1 || i === 5) ? 'text-center' : '';
                     return (
                       <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${center} ${responsive}`}>
                         {h}
@@ -313,14 +312,14 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="7" className="text-center py-16 text-brand-gray">
+                  <tr><td colSpan="6" className="text-center py-16 text-brand-gray">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-6 h-6 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
                       <span className="text-sm">Cargando equipos…</span>
                     </div>
                   </td></tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan="7" className="text-center py-16 text-brand-gray text-sm italic">
+                  <tr><td colSpan="6" className="text-center py-16 text-brand-gray text-sm italic">
                     No se encontraron equipos con los filtros actuales.
                   </td></tr>
                 ) : filteredItems.map(item => (
