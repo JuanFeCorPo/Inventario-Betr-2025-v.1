@@ -109,6 +109,14 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const handleDeactivate = async (reason, fecha) => { await deactivateItem(modal.data.id, reason, fecha); closeModal(); };
   const handleDelete     = async ()              => { await deleteItem(modal.data.id); closeModal(); };
 
+  // El modal guarda una foto del equipo al abrirse; esto la refresca con
+  // los datos en vivo de Firestore para que, ej., una nota nueva se vea
+  // de inmediato en la trazabilidad sin tener que cerrar y reabrir.
+  const liveModalData = useMemo(
+    () => (modal.data ? items.find(i => i.id === modal.data.id) ?? modal.data : null),
+    [items, modal.data],
+  );
+
   const stats = useMemo(() => {
     const activos = items.filter(i => i.estado !== 'De Baja');
     return {
@@ -335,7 +343,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
       </div>
 
       <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={closeModal} onSave={handleSave} currentItem={modal.data} items={items} />
-      <PreviewModal isOpen={modal.type === 'preview'} onClose={closeModal} item={modal.data} isAdmin={isAdmin}
+      <PreviewModal isOpen={modal.type === 'preview'} onClose={closeModal} item={liveModalData} isAdmin={isAdmin}
         onEdit={() => openModal('edit', modal.data)}
         onDeactivate={() => openModal('deactivate', modal.data)}
         onDelete={() => openModal('delete', modal.data)}
