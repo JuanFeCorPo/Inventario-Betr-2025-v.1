@@ -31,8 +31,8 @@ const EquipoRow = ({ item, onAction }) => (
     </td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono whitespace-nowrap">{item.numeroSerial || '—'}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
+    <td className="hidden 2xl:table-cell px-4 py-3.5 text-brand-gray text-xs font-mono whitespace-nowrap">{item.numeroSerial || '—'}</td>
+    <td className="hidden 2xl:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
     <td className="px-4 py-3.5 text-center" aria-label={`Ver detalle de ${item.nombre}`}>
       <Eye size={15} className="text-brand-gray inline-block" />
     </td>
@@ -301,7 +301,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
                   {['Nombre','Estado','Nº Inv','Categoría','Serial','Encargado',''].map((h, i) => {
-                    const responsive = { 4: 'hidden lg:table-cell', 5: 'hidden lg:table-cell' }[i] ?? '';
+                    const responsive = { 4: 'hidden 2xl:table-cell', 5: 'hidden 2xl:table-cell' }[i] ?? '';
                     const center     = (i === 1 || i === 6) ? 'text-center' : '';
                     return (
                       <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${center} ${responsive}`}>
