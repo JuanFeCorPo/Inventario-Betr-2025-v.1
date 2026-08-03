@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal, Button, StatusBadge, NewBadge } from '../ui';
 import HistoryTimeline from '../HistoryTimeline';
 import { exportItemHistory } from '../../utils/excel';
+import useEquipoHistorial from '../../hooks/useEquipoHistorial';
 import { Edit, Archive, Trash2, StickyNote, Download, Loader2 } from 'lucide-react';
 
 const Field = ({ label, value }) => (
@@ -11,10 +12,23 @@ const Field = ({ label, value }) => (
   </div>
 );
 
-const PreviewModal = ({ isOpen, onClose, item, isAdmin, onEdit, onDeactivate, onDelete, onAddNote }) => {
+const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote }) => {
   const [noteOpen,   setNoteOpen]   = useState(false);
   const [note,       setNote]       = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  const historial = useEquipoHistorial(db, item?.id);
+
+  // El historial se arma de tres fuentes: la entrada de creación (sintetizada,
+  // nunca se escribe en Firestore), el historial legado embebido (equipos
+  // antiguos) y la subcolección nueva — ver useInventory.js.
+  const combinedHistory = useMemo(() => {
+    if (!item) return [];
+    const synthetic = item.createdAt
+      ? [{ timestamp: item.createdAt, user: item.addedByEmail ?? '—', action: 'Equipo creado en el inventario.' }]
+      : [];
+    return [...synthetic, ...(item.history ?? []), ...historial];
+  }, [item, historial]);
 
   if (!isOpen || !item) return null;
 
@@ -74,7 +88,7 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, onEdit, onDeactivate, on
                   <StickyNote size={12} /> Agregar nota
                 </button>
               )}
-              <button onClick={() => exportItemHistory(item)}
+              <button onClick={() => exportItemHistory({ ...item, history: combinedHistory })}
                 className="flex items-center gap-1.5 text-xs text-brand-slate bg-brand-bg px-3 py-1.5 rounded-lg font-medium hover:bg-brand-border transition-colors">
                 <Download size={12} /> Exportar
               </button>
@@ -93,7 +107,7 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, onEdit, onDeactivate, on
           )}
 
           <div className="max-h-[35vh] overflow-y-auto pr-1">
-            <HistoryTimeline history={item.history} />
+            <HistoryTimeline history={combinedHistory} />
           </div>
         </div>
 

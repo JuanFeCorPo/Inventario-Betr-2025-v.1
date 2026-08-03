@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 import { Modal, Button } from '../ui';
 import { CATEGORIAS, ESTADOS, CONDICIONES } from '../../config/constants';
 
-const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [] }) => {
+const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encargados = [], onAddEncargado }) => {
   const [item, setItem] = useState({});
   const [motivoEstado, setMotivoEstado] = useState('');
   const [saving, setSaving] = useState(false);
@@ -42,6 +42,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [] }) => 
     try {
       const data = { ...item };
       if (data.fechaIngreso) data.fechaIngreso = Timestamp.fromDate(new Date(data.fechaIngreso));
+      if (data.personaEncargada?.trim()) await onAddEncargado?.(data.personaEncargada);
       await onSave(data, motivoEstado);
     } catch (err) {
       console.error(err);
@@ -70,7 +71,11 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [] }) => 
           <textarea name="observaciones" value={item.observaciones??''} onChange={handleChange}
             placeholder="Observaciones" className={`${f} md:col-span-2 h-24 resize-none`} />
           <input name="personaEncargada" value={item.personaEncargada??''} onChange={handleChange}
-            placeholder="Persona a Cargo" className={`${f} md:col-span-2`} />
+            placeholder="Persona a Cargo" list="encargados-sugeridos" autoComplete="off"
+            className={`${f} md:col-span-2`} />
+          <datalist id="encargados-sugeridos">
+            {encargados.map(nombre => <option key={nombre} value={nombre} />)}
+          </datalist>
         </div>
 
         {estadoChanged && (

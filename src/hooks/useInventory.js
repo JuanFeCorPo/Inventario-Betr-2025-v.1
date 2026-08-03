@@ -6,10 +6,12 @@
 
 import { useState, useEffect } from 'react';
 import {
-  collection, doc, getDoc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, query, Timestamp, arrayUnion, writeBatch,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { EQUIPOS_PATH, EQUIPOS_ELIMINADOS_PATH } from '../config/firebase';
+
+const HISTORIAL = 'historial';
 
 const useInventory = (db, user) => {
   const [items, setItems]     = useState([]);
@@ -31,6 +33,10 @@ const useInventory = (db, user) => {
   }, [db]);
 
   // ── Crear / Editar equipo ────────────────────
+  // La primera entrada ("Equipo creado…") no se escribe en el historial:
+  // se sintetiza en la UI a partir de createdAt/addedByEmail. Esto deja
+  // que Lector cree equipos sin necesitar permiso de escritura en historial
+  // (reservado a Administrador para ediciones, bajas y notas reales).
   const saveItem = async (itemData, motivoEstado) => {
     const { id, ...data } = itemData;
 
@@ -41,13 +47,17 @@ const useInventory = (db, user) => {
     }
 
     if (id) {
+      // El historial legado (si el equipo aún lo tiene embebido) llega en `data`
+      // porque el formulario parte de una copia de currentItem — nunca debe
+      // volver a escribirse ni entrar en el diff, solo vive de forma pasiva.
+      delete data.history;
+
       const ref      = doc(db, EQUIPOS_PATH, id);
       const snap     = await getDoc(ref);
       const oldData  = snap.data();
       const changes  = [];
 
       for (const key in data) {
-        if (key === 'history') continue;
         const oldVal = oldData[key];
         const newVal = data[key];
         if (newVal instanceof Timestamp && oldVal instanceof Timestamp) {
@@ -62,15 +72,17 @@ const useInventory = (db, user) => {
       if (motivoEstado?.trim() && changes.some(c => c.field === 'estado')) {
         action += `\nMotivo del cambio de estado: ${motivoEstado.trim()}`;
       }
-      const entry = { timestamp: Timestamp.now(), user: user.email, action, changes };
-      await updateDoc(ref, { ...data, history: arrayUnion(entry) });
+      await updateDoc(ref, data);
+      if (changes.length > 0) {
+        const entry = { timestamp: Timestamp.now(), user: user.email, action, changes };
+        await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
+      }
     } else {
-      const entry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo creado en el inventario.' };
       await addDoc(collection(db, EQUIPOS_PATH), {
         ...data,
         addedBy: user.uid,
+        addedByEmail: user.email,
         createdAt: Timestamp.now(),
-        history: [entry],
       });
     }
   };
@@ -79,41 +91,42 @@ const useInventory = (db, user) => {
   const deactivateItem = async (id, reason, fecha) => {
     const ref            = doc(db, EQUIPOS_PATH, id);
     const fechaTimestamp = Timestamp.fromDate(new Date(fecha));
+    await updateDoc(ref, {
+      estado: 'De Baja',
+      fecha_baja: fechaTimestamp,
+      motivo_baja: reason,
+    });
     const entry = {
       timestamp: Timestamp.now(),
       user: user.email,
       action: `Equipo dado de baja.\nMotivo: ${reason}`,
       fechaBaja: fechaTimestamp,
     };
-    await updateDoc(ref, {
-      estado: 'De Baja',
-      fecha_baja: fechaTimestamp,
-      motivo_baja: reason,
-      history: arrayUnion(entry),
-    });
+    await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
   };
 
   // ── Agregar nota (no toca observaciones) ─────
   const addNote = async (id, note) => {
     const entry = { timestamp: Timestamp.now(), user: user.email, action: `Nota: ${note}` };
-    await updateDoc(doc(db, EQUIPOS_PATH, id), { history: arrayUnion(entry) });
+    await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
   };
 
   // ── Importar en lote desde Excel ─────────────
   const importItems = async (rows) => {
-    const BATCH_SIZE = 450; // margen bajo el límite de 500 operaciones/lote de Firestore
+    const BATCH_SIZE = 200; // cada fila implica 2 escrituras (equipo + historial); margen bajo el límite de 500/lote
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = writeBatch(db);
       rows.slice(i, i + BATCH_SIZE).forEach(row => {
-        const entry = { timestamp: Timestamp.now(), user: user.email, action: 'Equipo importado desde Excel.' };
         const ref = doc(collection(db, EQUIPOS_PATH));
         batch.set(ref, {
           ...row,
           fechaIngreso: Timestamp.fromDate(new Date(row.fechaIngreso)),
           addedBy: user.uid,
+          addedByEmail: user.email,
           createdAt: Timestamp.now(),
-          history: [entry],
         });
+        const historialRef = doc(collection(db, EQUIPOS_PATH, ref.id, HISTORIAL));
+        batch.set(historialRef, { timestamp: Timestamp.now(), user: user.email, action: 'Equipo importado desde Excel.' });
       });
       await batch.commit();
     }
@@ -130,6 +143,12 @@ const useInventory = (db, user) => {
         deletedBy: user.email,
         deletedAt: Timestamp.now(),
       });
+    }
+    const historialSnap = await getDocs(collection(db, EQUIPOS_PATH, id, HISTORIAL));
+    if (!historialSnap.empty) {
+      const cleanupBatch = writeBatch(db);
+      historialSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
+      await cleanupBatch.commit();
     }
     await deleteDoc(ref);
   };

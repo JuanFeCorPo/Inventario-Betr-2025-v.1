@@ -26,5 +26,22 @@ service cloud.firestore {
       allow update, delete:  if isActiveAdmin();
     }
 
+    // Historial de un equipo (subcolección): solo lectura para cualquier
+    // usuario activo; solo Administrador puede agregar entradas (ediciones,
+    // notas, bajas). La creación de un equipo no requiere esta regla —
+    // esa primera entrada se sintetiza en la app a partir de createdAt.
+    match /artifacts/{appId}/public/data/equipos/{equipoId}/historial/{entryId} {
+      allow read:   if isActiveUser();
+      allow create: if isActiveAdmin();
+    }
+
+    // Necesaria para el reporte por periodo (consulta collectionGroup entre
+    // equipos) — Firestore exige esta forma de regla aparte para ese tipo
+    // de consulta, aunque el bloque anidado de arriba ya cubre lecturas
+    // normales por equipo.
+    match /{path=**}/historial/{entryId} {
+      allow read: if isActiveUser();
+    }
+
   }
 }

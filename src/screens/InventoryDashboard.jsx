@@ -3,15 +3,17 @@ import { StatCard, StatusBadge, NewBadge, Dropdown } from '../components/ui';
 import {
   CheckCircle, PlusCircle, AlertTriangle,
   Box, Users, Archive, LogOut, Eye, X, Wrench, Search,
-  Menu, Download, Upload, MoreVertical
+  Menu, Download, Upload, MoreVertical, FileSpreadsheet
 } from 'lucide-react';
 import IdleModal     from '../components/modals/IdleModal';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
 import PreviewModal  from '../components/modals/PreviewModal';
+import ReportModal   from '../components/modals/ReportModal';
 import { DeactivateModal, DeleteConfirmModal } from '../components/modals/OtherModals';
 import useIdleTimeout from '../hooks/useIdleTimeout';
 import useInventory   from '../hooks/useInventory';
+import useEncargados  from '../hooks/useEncargados';
 import { LOGO_URL, LOGO_FALLBACK, IDLE_TIME_MS, IDLE_WARNING_MS } from '../config/constants';
 import { exportInventory } from '../utils/excel';
 import { computeAlerts } from '../utils/alerts';
@@ -57,7 +59,7 @@ const EquipoCard = ({ item, onAction }) => (
 );
 
 // ── Menú de más opciones (móvil) ──────────────
-const MobileMenu = ({ isAdmin, onUsers, onExport, onImport }) => {
+const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -85,6 +87,7 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport }) => {
           {isAdmin  && item(<Users size={15} />, 'Usuarios', onUsers)}
           {item(<Download size={15} />, 'Exportar', onExport)}
           {isAdmin  && item(<Upload size={15} />, 'Importar', onImport)}
+          {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport)}
         </div>
       )}
     </div>
@@ -95,8 +98,10 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport }) => {
 const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const isAdmin = user.role === 'Administrador';
   const { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote } = useInventory(db, user);
+  const { encargados, addEncargado } = useEncargados(db);
   const [modal,          setModal]          = useState({ type: null, data: null });
   const [showImport,     setShowImport]     = useState(false);
+  const [showReport,     setShowReport]     = useState(false);
   const [searchTerm,     setSearchTerm]     = useState('');
   const [filterCategory, setFilterCategory] = useState('Todos');
   const [filterStatus,   setFilterStatus]   = useState('Activos');
@@ -180,7 +185,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')}
-              onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} />
+              onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             {isAdmin && (
               <button onClick={() => onNavigate('users')}
                 className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
@@ -195,6 +200,12 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               <button onClick={() => setShowImport(true)} aria-label="Importar inventario desde Excel" title="Importar desde Excel"
                 className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
                 <Upload size={15} /> Importar
+              </button>
+            )}
+            {isAdmin && (
+              <button onClick={() => setShowReport(true)} aria-label="Generar reporte por periodo" title="Generar reporte por periodo"
+                className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+                <FileSpreadsheet size={15} /> Reporte
               </button>
             )}
             <button onClick={() => openModal('add')} aria-label="Añadir equipo"
@@ -342,8 +353,9 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </div>
       </div>
 
-      <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={closeModal} onSave={handleSave} currentItem={modal.data} items={items} />
-      <PreviewModal isOpen={modal.type === 'preview'} onClose={closeModal} item={liveModalData} isAdmin={isAdmin}
+      <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={closeModal} onSave={handleSave} currentItem={modal.data} items={items}
+        encargados={encargados} onAddEncargado={addEncargado} />
+      <PreviewModal isOpen={modal.type === 'preview'} onClose={closeModal} item={liveModalData} isAdmin={isAdmin} db={db}
         onEdit={() => openModal('edit', modal.data)}
         onDeactivate={() => openModal('deactivate', modal.data)}
         onDelete={() => openModal('delete', modal.data)}
@@ -351,9 +363,10 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
       />
       <DeactivateModal isOpen={modal.type === 'deactivate'} onClose={closeModal} onDeactivate={handleDeactivate} />
       <DeleteConfirmModal isOpen={modal.type === 'delete'} onClose={closeModal} onConfirm={handleDelete} itemName={modal.data?.nombre} />
-      {isAdmin && (
+      {isAdmin && (<>
         <ImportModal isOpen={showImport} onClose={() => setShowImport(false)} items={items} onImport={importItems} />
-      )}
+        <ReportModal isOpen={showReport} onClose={() => setShowReport(false)} db={db} items={items} />
+      </>)}
     </div>
   );
 };

@@ -1,5 +1,9 @@
-import * as XLSX from 'xlsx';
 import { CATEGORIAS, ESTADOS, CONDICIONES } from '../config/constants';
+
+// La librería de Excel (xlsx) pesa bastante y la mayoría de las visitas
+// nunca exportan/importan nada — se carga solo cuando de verdad se usa,
+// en vez de ir siempre en el paquete inicial de la app.
+const loadXLSX = () => import('xlsx');
 
 export const COLUMNS = [
   { key: 'nombre',           label: 'Nombre' },
@@ -14,10 +18,12 @@ export const COLUMNS = [
 ];
 
 const DIACRITICS_RE = /[̀-ͯ]/g;
-const normalize = (s) =>
-  (s ?? '').toString().trim().toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '');
+export const normalize = (s) =>
+  (s ?? '').toString().trim().toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '')
+    .replace(/°/g, '') // "N° Inventario" -> "n inventario", igual que en HEADER_MAP
+    .replace(/\s+/g, ' ');
 
-const matchFromList = (value, list) => {
+export const matchFromList = (value, list) => {
   const norm = normalize(value);
   if (!norm) return null;
   const exact = list.find(o => normalize(o) === norm);
@@ -36,7 +42,8 @@ const excelDateToISO = (value) => {
 };
 
 // ── Exportar ──────────────────────────────────
-export function exportInventory(items) {
+export async function exportInventory(items) {
+  const XLSX = await loadXLSX();
   const rows = items.map(item => ({
     'Nombre': item.nombre ?? '',
     'Categoría': item.categoria ?? '',
@@ -67,7 +74,8 @@ export function exportInventory(items) {
 }
 
 // ── Exportar historial de un equipo individual ─
-export function exportItemHistory(item) {
+export async function exportItemHistory(item) {
+  const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
 
   const infoRows = [
@@ -100,6 +108,28 @@ export function exportItemHistory(item) {
   XLSX.writeFile(wb, `equipo_${safeName}.xlsx`);
 }
 
+// ── Reporte por periodo (movimientos de todos los equipos) ─
+// `entries`: [{ timestamp, equipoNombre, equipoInv, user, action, changes }]
+export async function exportPeriodReport(entries, startDate, endDate) {
+  const XLSX = await loadXLSX();
+  const sorted = [...entries].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+  const rows = sorted.map(e => ({
+    'Fecha':         e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString() : '',
+    'Equipo':        e.equipoNombre ?? '(equipo eliminado)',
+    'N° Inventario': e.equipoInv ?? '—',
+    'Usuario':       e.user ?? '',
+    'Acción':        e.action ?? '',
+    'Cambios':       (e.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | '),
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Fecha: '', Equipo: 'Sin movimientos en este periodo', 'N° Inventario': '', Usuario: '', 'Acción': '', Cambios: '' }]);
+  ws['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 16 }, { wch: 25 }, { wch: 40 }, { wch: 55 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+
+  XLSX.writeFile(wb, `reporte_inventario_${startDate}_a_${endDate}.xlsx`);
+}
+
 // ── Importar ──────────────────────────────────
 const HEADER_MAP = {
   nombre: ['nombre'],
@@ -119,7 +149,7 @@ function findField(row, key) {
   return header ? row[header] : '';
 }
 
-function parseRow(row, index) {
+export function parseRow(row, index) {
   const errors = [];
   const warnings = [];
 
@@ -170,8 +200,9 @@ export function parseInventoryExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await loadXLSX();
         const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });

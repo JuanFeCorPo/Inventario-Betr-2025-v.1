@@ -19,8 +19,9 @@ try {
 }
 
 export const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-export const EQUIPOS_PATH           = `artifacts/${APP_ID}/public/data/equipos`;
+export const EQUIPOS_PATH            = `artifacts/${APP_ID}/public/data/equipos`;
 export const EQUIPOS_ELIMINADOS_PATH = `artifacts/${APP_ID}/public/data/equipos_eliminados`;
+export const ENCARGADOS_PATH         = `artifacts/${APP_ID}/public/data/encargados`;
 export { firebaseConfig, configError };
 
 export function initFirebase() {
