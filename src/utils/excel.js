@@ -17,6 +17,16 @@ export const COLUMNS = [
   { key: 'observaciones',    label: 'Observaciones' },
 ];
 
+// Neutraliza inyección de fórmulas al exportar: si un valor libre (nombre,
+// observaciones, notas…) empieza con un carácter que Excel/Sheets puede
+// interpretar como inicio de fórmula, se le antepone un apóstrofe para que
+// quede como texto plano en vez de ejecutarse al abrir el archivo.
+const FORMULA_TRIGGER_RE = /^[=+\-@\t\r]/;
+export const sanitizeCell = (value) => {
+  const str = (value ?? '').toString();
+  return FORMULA_TRIGGER_RE.test(str) ? `'${str}` : str;
+};
+
 const DIACRITICS_RE = /[̀-ͯ]/g;
 export const normalize = (s) =>
   (s ?? '').toString().trim().toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '')
@@ -45,15 +55,15 @@ const excelDateToISO = (value) => {
 export async function exportInventory(items) {
   const XLSX = await loadXLSX();
   const rows = items.map(item => ({
-    'Nombre': item.nombre ?? '',
+    'Nombre': sanitizeCell(item.nombre),
     'Categoría': item.categoria ?? '',
     'Estado': item.estado ?? '',
     'Condición': item.condicion ?? 'Usado',
-    'N° Inventario': item.numeroInventario ?? '',
-    'N° Serial': item.numeroSerial ?? '',
+    'N° Inventario': sanitizeCell(item.numeroInventario),
+    'N° Serial': sanitizeCell(item.numeroSerial),
     'Fecha de Ingreso': item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toISOString().split('T')[0] : '',
-    'Persona Encargada': item.personaEncargada ?? '',
-    'Observaciones': item.observaciones ?? '',
+    'Persona Encargada': sanitizeCell(item.personaEncargada),
+    'Observaciones': sanitizeCell(item.observaciones),
   }));
 
   const wb = XLSX.utils.book_new();
@@ -79,15 +89,15 @@ export async function exportItemHistory(item) {
   const wb = XLSX.utils.book_new();
 
   const infoRows = [
-    { Campo: 'Nombre',            Valor: item.nombre ?? '' },
+    { Campo: 'Nombre',            Valor: sanitizeCell(item.nombre) },
     { Campo: 'Categoría',         Valor: item.categoria ?? '' },
     { Campo: 'Estado',            Valor: item.estado ?? '' },
     { Campo: 'Condición',         Valor: item.condicion ?? 'Usado' },
-    { Campo: 'N° Inventario',     Valor: item.numeroInventario ?? '' },
-    { Campo: 'N° Serial',         Valor: item.numeroSerial ?? '' },
+    { Campo: 'N° Inventario',     Valor: sanitizeCell(item.numeroInventario) },
+    { Campo: 'N° Serial',         Valor: sanitizeCell(item.numeroSerial) },
     { Campo: 'Fecha de Ingreso',  Valor: item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toISOString().split('T')[0] : '' },
-    { Campo: 'Persona Encargada', Valor: item.personaEncargada ?? '' },
-    { Campo: 'Observaciones',     Valor: item.observaciones ?? '' },
+    { Campo: 'Persona Encargada', Valor: sanitizeCell(item.personaEncargada) },
+    { Campo: 'Observaciones',     Valor: sanitizeCell(item.observaciones) },
   ];
   const wsInfo = XLSX.utils.json_to_sheet(infoRows);
   wsInfo['!cols'] = [{ wch: 20 }, { wch: 45 }];
@@ -96,9 +106,9 @@ export async function exportItemHistory(item) {
   const sorted = [...(item.history ?? [])].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
   const historyRows = sorted.map(h => ({
     'Fecha':   h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString() : '',
-    'Usuario': h.user ?? '',
-    'Acción':  h.action ?? '',
-    'Cambios': (h.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | '),
+    'Usuario': sanitizeCell(h.user),
+    'Acción':  sanitizeCell(h.action),
+    'Cambios': sanitizeCell((h.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | ')),
   }));
   const wsHist = XLSX.utils.json_to_sheet(historyRows.length ? historyRows : [{ Fecha: '', Usuario: '', 'Acción': 'Sin historial', Cambios: '' }]);
   wsHist['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 45 }, { wch: 55 }];
@@ -115,11 +125,11 @@ export async function exportPeriodReport(entries, startDate, endDate) {
   const sorted = [...entries].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
   const rows = sorted.map(e => ({
     'Fecha':         e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString() : '',
-    'Equipo':        e.equipoNombre ?? '(equipo eliminado)',
-    'N° Inventario': e.equipoInv ?? '—',
-    'Usuario':       e.user ?? '',
-    'Acción':        e.action ?? '',
-    'Cambios':       (e.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | '),
+    'Equipo':        e.equipoNombre ? sanitizeCell(e.equipoNombre) : '(equipo eliminado)',
+    'N° Inventario': sanitizeCell(e.equipoInv ?? '—'),
+    'Usuario':       sanitizeCell(e.user),
+    'Acción':        sanitizeCell(e.action),
+    'Cambios':       sanitizeCell((e.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | ')),
   }));
 
   const wb = XLSX.utils.book_new();

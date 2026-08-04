@@ -15,7 +15,10 @@ const LoginScreen = ({ onLogin, accessError }) => {
     try {
       await onLogin(email, password);
     } catch {
-      setError('Credenciales incorrectas o error de conexión.');
+      // Mensaje siempre igual (correo inexistente, contraseña incorrecta,
+      // cuenta bloqueada por intentos fallidos, etc.) para no revelar
+      // por qué falló el intento.
+      setError('Email o contraseña incorrectos.');
       setLoading(false);
     }
   };

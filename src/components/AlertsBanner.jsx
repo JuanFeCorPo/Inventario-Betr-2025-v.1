@@ -18,7 +18,7 @@ const AlertsBanner = ({ alerts, onGoTo }) => {
       <div className="space-y-2">
         {visible.map(alert => {
           const isHigh = alert.severity === 'high';
-          const clickable = !!alert.filterCategory;
+          const clickable = !!alert.filterCategory || !!alert.navigateTo;
           return (
             <div key={alert.id}
               className={`flex items-start gap-3 rounded-xl p-3 border ${isHigh ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}`}>

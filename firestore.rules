@@ -15,6 +15,20 @@ service cloud.firestore {
       return isActiveUser() && callerDoc().get('role', 'Lector') == 'Administrador';
     }
 
+    // Valida los documentos de bloqueo de login (ver src/utils/loginLockout.js).
+    // Se escriben sin sesión iniciada (el bloqueo se revisa antes del login),
+    // así que esta validación es la única defensa del lado del servidor:
+    // limita la forma exacta del documento y evita que alguien fije un
+    // bloqueo más largo de ~1h5min.
+    function isValidLoginAttemptWrite() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['failedCount', 'lockedUntil', 'lastAttempt'])
+        && d.failedCount is int && d.failedCount >= 0 && d.failedCount <= 3
+        && d.lastAttempt is timestamp
+        && (d.lockedUntil == null
+            || (d.lockedUntil is timestamp && d.lockedUntil <= request.time + duration.value(65, 'm')));
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isActiveAdmin());
       allow write: if isActiveAdmin();
@@ -41,6 +55,13 @@ service cloud.firestore {
     // normales por equipo.
     match /{path=**}/historial/{entryId} {
       allow read: if isActiveUser();
+    }
+
+    // Bloqueo de login por intentos fallidos — debe ser accesible sin
+    // sesión iniciada, ya que se revisa antes de intentar autenticar.
+    match /loginAttempts/{email} {
+      allow read:  if true;
+      allow write: if isValidLoginAttemptWrite();
     }
 
   }

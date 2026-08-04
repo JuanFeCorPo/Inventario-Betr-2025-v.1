@@ -22,6 +22,10 @@ export const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-
 export const EQUIPOS_PATH            = `artifacts/${APP_ID}/public/data/equipos`;
 export const EQUIPOS_ELIMINADOS_PATH = `artifacts/${APP_ID}/public/data/equipos_eliminados`;
 export const ENCARGADOS_PATH         = `artifacts/${APP_ID}/public/data/encargados`;
+// Colección de nivel raíz (no bajo artifacts/.../public/data): debe ser
+// legible/escribible sin sesión iniciada, ya que el bloqueo se evalúa
+// antes de intentar el login.
+export const LOGIN_ATTEMPTS_PATH = 'loginAttempts';
 export { firebaseConfig, configError };
 
 export function initFirebase() {

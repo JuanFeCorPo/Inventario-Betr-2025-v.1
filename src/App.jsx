@@ -6,9 +6,11 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 
 import { firebaseConfig, configError, initFirebase } from './config/firebase';
+import { isLoginLocked, recordFailedLogin, clearLoginAttempts } from './utils/loginLockout';
 import LoginScreen        from './screens/LoginScreen';
 import InventoryDashboard from './screens/InventoryDashboard';
 import UsersScreen        from './screens/UsersScreen';
+import MaintenanceScreen  from './screens/MaintenanceScreen';
 import ConfigErrorScreen  from './screens/ConfigErrorScreen';
 
 export default function App() {
@@ -72,8 +74,22 @@ export default function App() {
   const handleLogin = async (email, password) => {
     if (!auth) throw new Error('Firebase auth no está listo.');
     setAuthError('');
+
+    // El bloqueo se revisa en Firestore (no solo en este navegador) antes
+    // de intentar el login, para que no se pueda evadir borrando el caché.
+    if (await isLoginLocked(db, email)) {
+      throw new Error('Cuenta bloqueada temporalmente por demasiados intentos fallidos.');
+    }
+
     await setPersistence(auth, browserSessionPersistence);
-    return signInWithEmailAndPassword(auth, email, password);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      await clearLoginAttempts(db, email);
+      return result;
+    } catch (err) {
+      await recordFailedLogin(db, email);
+      throw err;
+    }
   };
 
   const handleLogout = () => { setScreen('dashboard'); signOut(auth); };
@@ -91,6 +107,10 @@ export default function App() {
 
   if (screen === 'users' && user.role === 'Administrador') {
     return <UsersScreen db={db} currentUser={user} onBack={() => setScreen('dashboard')} />;
+  }
+
+  if (screen === 'maintenance') {
+    return <MaintenanceScreen db={db} user={user} onBack={() => setScreen('dashboard')} />;
   }
 
   return (

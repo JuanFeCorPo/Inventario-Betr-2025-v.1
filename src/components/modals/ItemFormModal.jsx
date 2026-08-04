@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { Modal, Button } from '../ui';
-import { CATEGORIAS, ESTADOS, CONDICIONES } from '../../config/constants';
+import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_MANTENIMIENTO, FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT } from '../../config/constants';
 
 const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encargados = [], onAddEncargado }) => {
   const [item, setItem] = useState({});
@@ -42,6 +42,11 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
     try {
       const data = { ...item };
       if (data.fechaIngreso) data.fechaIngreso = Timestamp.fromDate(new Date(data.fechaIngreso));
+      if (CATEGORIAS_CON_MANTENIMIENTO.includes(data.categoria)) {
+        data.frecuenciaMantenimientoMeses = Number(data.frecuenciaMantenimientoMeses) || FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT;
+      } else {
+        delete data.frecuenciaMantenimientoMeses;
+      }
       if (data.personaEncargada?.trim()) await onAddEncargado?.(data.personaEncargada);
       await onSave(data, motivoEstado);
     } catch (err) {
@@ -68,6 +73,16 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
           <select name="condicion" value={item.condicion??'Nuevo'} onChange={handleChange} className={f}>
             {CONDICIONES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {CATEGORIAS_CON_MANTENIMIENTO.includes(item.categoria) && (
+            <div>
+              <label className="text-xs font-semibold text-brand-gray mb-1 block">
+                Frecuencia de mantenimiento (meses)
+              </label>
+              <input type="number" name="frecuenciaMantenimientoMeses" min="1"
+                value={item.frecuenciaMantenimientoMeses ?? FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT}
+                onChange={handleChange} className={f} />
+            </div>
+          )}
           <textarea name="observaciones" value={item.observaciones??''} onChange={handleChange}
             placeholder="Observaciones" className={`${f} md:col-span-2 h-24 resize-none`} />
           <input name="personaEncargada" value={item.personaEncargada??''} onChange={handleChange}

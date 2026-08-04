@@ -17,6 +17,7 @@ import useEncargados  from '../hooks/useEncargados';
 import { LOGO_URL, LOGO_FALLBACK, IDLE_TIME_MS, IDLE_WARNING_MS } from '../config/constants';
 import { exportInventory } from '../utils/excel';
 import { computeAlerts } from '../utils/alerts';
+import { countOverdueMaintenance } from '../utils/maintenance';
 import AlertsBanner  from '../components/AlertsBanner';
 import CategoryChart from '../components/CategoryChart';
 
@@ -59,7 +60,7 @@ const EquipoCard = ({ item, onAction }) => (
 );
 
 // ── Menú de más opciones (móvil) ──────────────
-const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
+const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintenance }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -85,6 +86,7 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-52 bg-white border border-brand-border rounded-xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in py-1">
           {isAdmin  && item(<Users size={15} />, 'Usuarios', onUsers)}
+          {item(<Wrench size={15} />, 'Mantenimientos', onMaintenance)}
           {item(<Download size={15} />, 'Exportar', onExport)}
           {isAdmin  && item(<Upload size={15} />, 'Importar', onImport)}
           {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport)}
@@ -135,8 +137,10 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   }, [items]);
 
   const alerts = useMemo(() => computeAlerts(items), [items]);
+  const maintenanceOverdue = useMemo(() => countOverdueMaintenance(items), [items]);
 
   const goToAlert = (alert) => {
+    if (alert.navigateTo) { onNavigate(alert.navigateTo); return; }
     setFilterCategory(alert.filterCategory ?? 'Todos');
     setFilterStatus(alert.filterStatus ?? 'Todos');
   };
@@ -184,7 +188,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')}
+            <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
               onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             {isAdmin && (
               <button onClick={() => onNavigate('users')}
@@ -192,6 +196,15 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                 <Users size={15} /> Usuarios
               </button>
             )}
+            <button onClick={() => onNavigate('maintenance')} aria-label="Ver mantenimientos preventivos" title="Mantenimientos preventivos"
+              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm relative">
+              <Wrench size={15} /> Mantenimientos
+              {maintenanceOverdue > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                  {maintenanceOverdue}
+                </span>
+              )}
+            </button>
             <button onClick={() => exportInventory(items)} aria-label="Exportar inventario a Excel" title="Exportar a Excel"
               className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
               <Download size={15} /> Exportar

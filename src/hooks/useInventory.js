@@ -111,6 +111,19 @@ const useInventory = (db, user) => {
     await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
   };
 
+  // ── Registrar mantenimiento preventivo realizado ──
+  const registerMaintenance = async (id, fecha, notas) => {
+    const ref             = doc(db, EQUIPOS_PATH, id);
+    const fechaTimestamp  = Timestamp.fromDate(new Date(fecha));
+    await updateDoc(ref, { ultimoMantenimiento: fechaTimestamp });
+    const entry = {
+      timestamp: Timestamp.now(),
+      user: user.email,
+      action: `Mantenimiento preventivo realizado.${notas?.trim() ? `\n${notas.trim()}` : ''}`,
+    };
+    await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
+  };
+
   // ── Importar en lote desde Excel ─────────────
   const importItems = async (rows) => {
     const BATCH_SIZE = 200; // cada fila implica 2 escrituras (equipo + historial); margen bajo el límite de 500/lote
@@ -153,7 +166,7 @@ const useInventory = (db, user) => {
     await deleteDoc(ref);
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote };
+  return { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote, registerMaintenance };
 };
 
 export default useInventory;

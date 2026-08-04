@@ -3,6 +3,7 @@ import { Modal, Button, StatusBadge, NewBadge } from '../ui';
 import HistoryTimeline from '../HistoryTimeline';
 import { exportItemHistory } from '../../utils/excel';
 import useEquipoHistorial from '../../hooks/useEquipoHistorial';
+import { getMaintenanceInfo } from '../../utils/maintenance';
 import { Edit, Archive, Trash2, StickyNote, Download, Loader2 } from 'lucide-react';
 
 const Field = ({ label, value }) => (
@@ -31,6 +32,8 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
   }, [item, historial]);
 
   if (!isOpen || !item) return null;
+
+  const maintenanceInfo = getMaintenanceInfo(item);
 
   const handleAddNote = async () => {
     if (!note.trim()) return;
@@ -67,6 +70,10 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
             <Field label="Fecha de Baja" value={item.fecha_baja?.toDate ? item.fecha_baja.toDate().toLocaleDateString() : '—'} />
           )}
           {item.motivo_baja && <Field label="Motivo de Baja" value={item.motivo_baja} />}
+          {maintenanceInfo && (
+            <Field label="Próximo Mantenimiento"
+              value={`${maintenanceInfo.proximaFecha.toLocaleDateString()} ${maintenanceInfo.urgencia === 'vencido' ? '(vencido)' : ''}`} />
+          )}
         </div>
 
         {/* Observaciones */}

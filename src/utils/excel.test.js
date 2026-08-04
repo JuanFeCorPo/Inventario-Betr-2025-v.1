@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { normalize, matchFromList, parseRow } from './excel';
+import { normalize, matchFromList, parseRow, sanitizeCell } from './excel';
 import { CATEGORIAS, ESTADOS } from '../config/constants';
+
+describe('sanitizeCell', () => {
+  it('antepone un apóstrofe a valores que empiezan como fórmula (inyección de fórmulas)', () => {
+    expect(sanitizeCell('=HYPERLINK("http://evil.com","click")')).toBe('\'=HYPERLINK("http://evil.com","click")');
+    expect(sanitizeCell('+1234')).toBe("'+1234");
+    expect(sanitizeCell('-1234')).toBe("'-1234");
+    expect(sanitizeCell('@SUM(A1)')).toBe("'@SUM(A1)");
+  });
+
+  it('deja intactos los valores normales', () => {
+    expect(sanitizeCell('Laptop Dell XPS')).toBe('Laptop Dell XPS');
+    expect(sanitizeCell('')).toBe('');
+    expect(sanitizeCell(null)).toBe('');
+    expect(sanitizeCell(undefined)).toBe('');
+  });
+});
 
 describe('normalize', () => {
   it('quita tildes, mayúsculas y espacios extremos', () => {

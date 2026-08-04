@@ -1,3 +1,5 @@
+import { countOverdueMaintenance } from './maintenance';
+
 const STALE_DAYS_THRESHOLD  = 30;
 const MANY_OOS_THRESHOLD    = 3;
 
@@ -49,6 +51,17 @@ export function computeAlerts(items) {
       message: `${stale.length} equipo${stale.length !== 1 ? 's' : ''} llevan más de ${STALE_DAYS_THRESHOLD} días sin salir de Mantenimiento/Fuera de Servicio.`,
       filterStatus: null, // se resuelve en el dashboard mostrando ambos estados
       staleFilter: true,
+    });
+  }
+
+  // 3) Mantenimientos preventivos vencidos (Laptops / CPU)
+  const overdueMaintenance = countOverdueMaintenance(items);
+  if (overdueMaintenance > 0) {
+    alerts.push({
+      id: 'maintenance-overdue',
+      severity: 'high',
+      message: `${overdueMaintenance} equipo${overdueMaintenance !== 1 ? 's tienen' : ' tiene'} mantenimiento preventivo vencido.`,
+      navigateTo: 'maintenance',
     });
   }
 

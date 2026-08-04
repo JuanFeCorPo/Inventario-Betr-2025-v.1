@@ -6,8 +6,12 @@
 export const CATEGORIAS = [
   'Periféricos', 'Monitores', 'Laptops', 'CPU', 'Cámaras', 'Luces',
   'Audio', 'Electrodomésticos', 'Smartphones', 'Adaptadores', 'UPS',
-  'Bases y Soportes', 'Estabilizadores', 'Otros',
+  'Bases y Soportes', 'Estabilizadores', 'Servidores y Red', 'Otros',
 ];
+
+// Categorías con mantenimiento preventivo programado (ver src/utils/maintenance.js)
+export const CATEGORIAS_CON_MANTENIMIENTO = ['Laptops', 'CPU'];
+export const FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT = 6;
 
 export const ESTADOS = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio'];
 
