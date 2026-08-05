@@ -14,11 +14,13 @@ import { DeactivateModal, DeleteConfirmModal } from '../components/modals/OtherM
 import useIdleTimeout from '../hooks/useIdleTimeout';
 import useInventory   from '../hooks/useInventory';
 import useEncargados  from '../hooks/useEncargados';
+import useDismissedAlerts from '../hooks/useDismissedAlerts';
 import { LOGO_URL, LOGO_FALLBACK, IDLE_TIME_MS, IDLE_WARNING_MS } from '../config/constants';
 import { exportInventory } from '../utils/excel';
 import { computeAlerts } from '../utils/alerts';
+import { isAlertDismissed } from '../utils/dismissedAlerts';
 import { countOverdueMaintenance } from '../utils/maintenance';
-import AlertsBanner  from '../components/AlertsBanner';
+import AlertsBell     from '../components/AlertsBell';
 import CategoryChart from '../components/CategoryChart';
 
 // ── Fila de tabla (desktop) ──────────────────
@@ -70,26 +72,32 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const item = (icon, label, onClick) => (
+  const item = (icon, label, onClick, colorClass) => (
     <button type="button" onClick={() => { setOpen(false); onClick(); }}
-      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-brand-ink hover:bg-brand-bg transition-colors text-left">
-      {icon} {label}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-ink hover:bg-brand-bg rounded-xl transition-colors text-left">
+      <span className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 ${colorClass}`}>{icon}</span>
+      {label}
     </button>
   );
 
   return (
     <div ref={ref} className="relative sm:hidden">
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Más opciones"
-        className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-xl transition-all shadow-sm">
+        className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition-all shadow-sm hover:shadow-md">
         <MoreVertical size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-52 bg-white border border-brand-border rounded-xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in py-1">
-          {isAdmin  && item(<Users size={15} />, 'Usuarios', onUsers)}
-          {item(<Wrench size={15} />, 'Mantenimientos', onMaintenance)}
-          {item(<Download size={15} />, 'Exportar', onExport)}
-          {isAdmin  && item(<Upload size={15} />, 'Importar', onImport)}
-          {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport)}
+        <div className="absolute right-0 z-50 mt-2 w-64 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in">
+          <div className="px-4 py-2.5 border-b border-brand-border bg-brand-bg/50">
+            <p className="text-xs font-semibold text-brand-gray uppercase tracking-wider">Más opciones</p>
+          </div>
+          <div className="p-2 space-y-0.5">
+            {isAdmin  && item(<Users size={15} />, 'Usuarios', onUsers, 'bg-slate-100 text-slate-600')}
+            {item(<Wrench size={15} />, 'Mantenimientos', onMaintenance, 'bg-violet-100 text-violet-600')}
+            {item(<Download size={15} />, 'Exportar', onExport, 'bg-blue-100 text-blue-600')}
+            {isAdmin  && item(<Upload size={15} />, 'Importar', onImport, 'bg-emerald-100 text-emerald-600')}
+            {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport, 'bg-brand-orange/10 text-brand-orange')}
+          </div>
         </div>
       )}
     </div>
@@ -101,6 +109,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const isAdmin = user.role === 'Administrador';
   const { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote } = useInventory(db, user);
   const { encargados, addEncargado } = useEncargados(db);
+  const { dismissedMap, dismissAlert } = useDismissedAlerts(db, user);
   const [modal,          setModal]          = useState({ type: null, data: null });
   const [showImport,     setShowImport]     = useState(false);
   const [showReport,     setShowReport]     = useState(false);
@@ -136,10 +145,16 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
     };
   }, [items]);
 
-  const alerts = useMemo(() => computeAlerts(items), [items]);
+  const alerts = useMemo(
+    () => computeAlerts(items).filter(a => !isAlertDismissed(dismissedMap, a.id)),
+    [items, dismissedMap],
+  );
   const maintenanceOverdue = useMemo(() => countOverdueMaintenance(items), [items]);
 
+  // "Ver" también descarta la alerta (por 15 días — vuelve a aparecer si
+  // el problema sigue sin resolverse).
   const goToAlert = (alert) => {
+    dismissAlert(alert.id);
     if (alert.navigateTo) { onNavigate(alert.navigateTo); return; }
     setFilterCategory(alert.filterCategory ?? 'Todos');
     setFilterStatus(alert.filterStatus ?? 'Todos');
@@ -188,6 +203,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <AlertsBell alerts={alerts} onGoTo={goToAlert} onDismiss={dismissAlert} />
             <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
               onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             {isAdmin && (
@@ -233,9 +249,6 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             </button>
           </div>
         </header>
-
-        {/* ── Alertas inteligentes ───────────── */}
-        <AlertsBanner alerts={alerts} onGoTo={goToAlert} />
 
         {/* ── Stat Cards ─────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">

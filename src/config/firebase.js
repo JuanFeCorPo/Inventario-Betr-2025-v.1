@@ -26,6 +26,9 @@ export const ENCARGADOS_PATH         = `artifacts/${APP_ID}/public/data/encargad
 // legible/escribible sin sesión iniciada, ya que el bloqueo se evalúa
 // antes de intentar el login.
 export const LOGIN_ATTEMPTS_PATH = 'loginAttempts';
+// También raíz: se comparte entre todos los usuarios (si un administrador
+// descarta una alerta, no debe volver a salirle a otro en otro equipo).
+export const DISMISSED_ALERTS_PATH = 'dismissedAlerts';
 export { firebaseConfig, configError };
 
 export function initFirebase() {
