@@ -14,8 +14,13 @@ export const GRUPOS_URGENCIA = [
   { key: 'proximo',     label: 'Próximos' },
 ];
 
+// Fuera de Servicio se excluye igual que De Baja: mientras el equipo está
+// dañado y no se le va a hacer mantenimiento (ej. falla de board), no tiene
+// sentido seguir avisando — vuelve a aparecer solo si su estado cambia.
 export function aplicaMantenimiento(item) {
-  return CATEGORIAS_CON_MANTENIMIENTO.includes(item?.categoria) && item?.estado !== 'De Baja';
+  return CATEGORIAS_CON_MANTENIMIENTO.includes(item?.categoria)
+    && item?.estado !== 'De Baja'
+    && item?.estado !== 'Fuera de Servicio';
 }
 
 function toDate(value) {

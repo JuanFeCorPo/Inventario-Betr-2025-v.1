@@ -25,6 +25,10 @@ describe('getMaintenanceInfo', () => {
     expect(getMaintenanceInfo(makeItem({ estado: 'De Baja' }))).toBeNull();
   });
 
+  it('devuelve null para equipos fuera de servicio (dañados, sin mantenimiento previsto)', () => {
+    expect(getMaintenanceInfo(makeItem({ estado: 'Fuera de Servicio', ultimoMantenimiento: daysAgo(200) }))).toBeNull();
+  });
+
   it('devuelve null si no hay fecha base (ni ultimoMantenimiento, ni fechaIngreso, ni createdAt)', () => {
     expect(getMaintenanceInfo(makeItem({ createdAt: undefined }))).toBeNull();
   });
@@ -68,6 +72,7 @@ describe('groupMaintenanceByUrgency', () => {
       makeItem({ categoria: 'Periféricos' }), // no aplica
       makeItem({ ultimoMantenimiento: daysAgo(200) }), // vencido
       makeItem({ categoria: 'CPU', ultimoMantenimiento: daysAgo(190) }), // vencido
+      makeItem({ estado: 'Fuera de Servicio', ultimoMantenimiento: daysAgo(500) }), // dañado, no aplica
     ];
     const groups = groupMaintenanceByUrgency(items, NOW);
     expect(groups).toHaveLength(1);
