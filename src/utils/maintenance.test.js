@@ -29,6 +29,16 @@ describe('getMaintenanceInfo', () => {
     expect(getMaintenanceInfo(makeItem({ estado: 'Fuera de Servicio', ultimoMantenimiento: daysAgo(200) }))).toBeNull();
   });
 
+  it('devuelve null para equipos excluidos manualmente (backup sin uso)', () => {
+    const enBackup = makeItem({ estado: 'Disponible', sinMantenimiento: true, ultimoMantenimiento: daysAgo(200) });
+    expect(getMaintenanceInfo(enBackup)).toBeNull();
+  });
+
+  it('sigue calculando si sinMantenimiento es false o no está definido', () => {
+    expect(getMaintenanceInfo(makeItem({ sinMantenimiento: false, ultimoMantenimiento: daysAgo(200) }), NOW).urgencia).toBe('vencido');
+    expect(getMaintenanceInfo(makeItem({ ultimoMantenimiento: daysAgo(200) }), NOW).urgencia).toBe('vencido');
+  });
+
   it('devuelve null si no hay fecha base (ni ultimoMantenimiento, ni fechaIngreso, ni createdAt)', () => {
     expect(getMaintenanceInfo(makeItem({ createdAt: undefined }))).toBeNull();
   });

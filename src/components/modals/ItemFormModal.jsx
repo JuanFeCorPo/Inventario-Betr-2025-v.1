@@ -21,7 +21,10 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
     );
   }, [isOpen, currentItem]);
 
-  const handleChange = e => setItem(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = e => setItem(prev => ({
+    ...prev,
+    [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value,
+  }));
   const estadoChanged = currentItem && item.estado !== currentItem.estado;
 
   const findDuplicate = (field, label) => {
@@ -43,9 +46,11 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
       const data = { ...item };
       if (data.fechaIngreso) data.fechaIngreso = Timestamp.fromDate(new Date(data.fechaIngreso));
       if (CATEGORIAS_CON_MANTENIMIENTO.includes(data.categoria)) {
+        data.sinMantenimiento = data.sinMantenimiento === true;
         data.frecuenciaMantenimientoMeses = Number(data.frecuenciaMantenimientoMeses) || FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT;
       } else {
         delete data.frecuenciaMantenimientoMeses;
+        delete data.sinMantenimiento;
       }
       if (data.personaEncargada?.trim()) await onAddEncargado?.(data.personaEncargada);
       await onSave(data, motivoEstado);
@@ -75,12 +80,23 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
           </select>
           {CATEGORIAS_CON_MANTENIMIENTO.includes(item.categoria) && (
             <div>
-              <label className="text-xs font-semibold text-brand-gray mb-1 block">
-                Frecuencia de mantenimiento (meses)
+              {!item.sinMantenimiento && (<>
+                <label className="text-xs font-semibold text-brand-gray mb-1 block">
+                  Frecuencia de mantenimiento (meses)
+                </label>
+                <input type="number" name="frecuenciaMantenimientoMeses" min="1"
+                  value={item.frecuenciaMantenimientoMeses ?? FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT}
+                  onChange={handleChange} className={f} />
+              </>)}
+              <label className="flex items-start gap-2 mt-2 cursor-pointer">
+                <input type="checkbox" name="sinMantenimiento" checked={item.sinMantenimiento === true}
+                  onChange={handleChange}
+                  className="mt-0.5 w-4 h-4 rounded border-brand-border text-brand-orange focus:ring-2 focus:ring-brand-orange/50 flex-shrink-0" />
+                <span className="text-xs text-brand-slate leading-tight">
+                  No requiere mantenimiento preventivo
+                  <span className="block text-brand-gray">Ej. equipos en backup sin uso.</span>
+                </span>
               </label>
-              <input type="number" name="frecuenciaMantenimientoMeses" min="1"
-                value={item.frecuenciaMantenimientoMeses ?? FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT}
-                onChange={handleChange} className={f} />
             </div>
           )}
           <textarea name="observaciones" value={item.observaciones??''} onChange={handleChange}

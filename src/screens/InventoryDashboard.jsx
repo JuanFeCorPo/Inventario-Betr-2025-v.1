@@ -5,17 +5,15 @@ import {
   Box, Users, Archive, LogOut, Eye, X, Wrench, Search,
   Menu, Download, Upload, MoreVertical, FileSpreadsheet
 } from 'lucide-react';
-import IdleModal     from '../components/modals/IdleModal';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
 import PreviewModal  from '../components/modals/PreviewModal';
 import ReportModal   from '../components/modals/ReportModal';
 import { DeactivateModal, DeleteConfirmModal } from '../components/modals/OtherModals';
-import useIdleTimeout from '../hooks/useIdleTimeout';
 import useInventory   from '../hooks/useInventory';
 import useEncargados  from '../hooks/useEncargados';
 import useDismissedAlerts from '../hooks/useDismissedAlerts';
-import { LOGO_URL, LOGO_FALLBACK, IDLE_TIME_MS, IDLE_WARNING_MS } from '../config/constants';
+import { LOGO_URL, LOGO_FALLBACK } from '../config/constants';
 import { exportInventory } from '../utils/excel';
 import { computeAlerts } from '../utils/alerts';
 import { isAlertDismissed } from '../utils/dismissedAlerts';
@@ -117,7 +115,6 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const [filterCategory, setFilterCategory] = useState('Todos');
   const [filterStatus,   setFilterStatus]   = useState('Activos');
   const [mobileFilters,  setMobileFilters]  = useState(false);
-  const { expired: sessionExpired, countdown: idleCountdown } = useIdleTimeout(onLogout, user, IDLE_TIME_MS, IDLE_WARNING_MS);
 
   const openModal  = (type, data = null) => setModal({ type, data });
   const closeModal = () => setModal({ type: null, data: null });
@@ -179,7 +176,6 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-ink font-sans">
-      {sessionExpired && <IdleModal countdown={idleCountdown} />}
       <div className="fixed top-0 right-0 w-[600px] h-[400px] bg-brand-orange/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">

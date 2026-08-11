@@ -17,8 +17,11 @@ export const GRUPOS_URGENCIA = [
 // Fuera de Servicio se excluye igual que De Baja: mientras el equipo está
 // dañado y no se le va a hacer mantenimiento (ej. falla de board), no tiene
 // sentido seguir avisando — vuelve a aparecer solo si su estado cambia.
+// `sinMantenimiento` es la exclusión manual (equipos en backup sin uso),
+// independiente del estado — se marca desde el formulario del equipo.
 export function aplicaMantenimiento(item) {
   return CATEGORIAS_CON_MANTENIMIENTO.includes(item?.categoria)
+    && item?.sinMantenimiento !== true
     && item?.estado !== 'De Baja'
     && item?.estado !== 'Fuera de Servicio';
 }

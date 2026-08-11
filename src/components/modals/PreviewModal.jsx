@@ -74,6 +74,9 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
             <Field label="Próximo Mantenimiento"
               value={`${maintenanceInfo.proximaFecha.toLocaleDateString()} ${maintenanceInfo.urgencia === 'vencido' ? '(vencido)' : ''}`} />
           )}
+          {item.sinMantenimiento === true && (
+            <Field label="Mantenimiento" value="Excluido (sin uso)" />
+          )}
         </div>
 
         {/* Observaciones */}

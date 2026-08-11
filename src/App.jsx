@@ -7,6 +7,9 @@ import { doc, getDoc } from 'firebase/firestore';
 
 import { firebaseConfig, configError, initFirebase } from './config/firebase';
 import { isLoginLocked, recordFailedLogin, clearLoginAttempts } from './utils/loginLockout';
+import { IDLE_TIME_MS, IDLE_WARNING_MS } from './config/constants';
+import useIdleTimeout     from './hooks/useIdleTimeout';
+import IdleModal          from './components/modals/IdleModal';
 import LoginScreen        from './screens/LoginScreen';
 import InventoryDashboard from './screens/InventoryDashboard';
 import UsersScreen        from './screens/UsersScreen';
@@ -94,6 +97,12 @@ export default function App() {
 
   const handleLogout = () => { setScreen('dashboard'); signOut(auth); };
 
+  // El control de inactividad vive aquí y no en el dashboard: antes, al entrar
+  // a Usuarios o Mantenimientos el temporizador se desmontaba con la pantalla
+  // y el aviso no salía. Aquí aplica a todas por igual.
+  const { expired: sessionExpired, countdown: idleCountdown } =
+    useIdleTimeout(handleLogout, user, IDLE_TIME_MS, IDLE_WARNING_MS);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-bg flex justify-center items-center">
@@ -105,20 +114,16 @@ export default function App() {
   if (hasError) return <ConfigErrorScreen />;
   if (!user)    return <LoginScreen onLogin={handleLogin} accessError={authError} />;
 
-  if (screen === 'users' && user.role === 'Administrador') {
-    return <UsersScreen db={db} currentUser={user} onBack={() => setScreen('dashboard')} />;
-  }
-
-  if (screen === 'maintenance') {
-    return <MaintenanceScreen db={db} user={user} onBack={() => setScreen('dashboard')} />;
-  }
+  const screenEl = (screen === 'users' && user.role === 'Administrador')
+    ? <UsersScreen db={db} currentUser={user} onBack={() => setScreen('dashboard')} />
+    : screen === 'maintenance'
+      ? <MaintenanceScreen db={db} user={user} onBack={() => setScreen('dashboard')} />
+      : <InventoryDashboard user={user} onLogout={handleLogout} db={db} onNavigate={setScreen} />;
 
   return (
-    <InventoryDashboard
-      user={user}
-      onLogout={handleLogout}
-      db={db}
-      onNavigate={setScreen}
-    />
+    <>
+      {sessionExpired && <IdleModal countdown={idleCountdown} />}
+      {screenEl}
+    </>
   );
 }
