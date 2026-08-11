@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { Modal, Button } from '../ui';
 import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_MANTENIMIENTO, FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT } from '../../config/constants';
+import { findDuplicateConflicts } from '../../utils/duplicates';
+import { DuplicateWarningModal } from './OtherModals';
 
 const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encargados = [], onAddEncargado }) => {
   const [item, setItem] = useState({});
   const [motivoEstado, setMotivoEstado] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [conflicts, setConflicts] = useState([]);
   const f = 'bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all w-full';
 
   useEffect(() => {
@@ -15,6 +18,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
     setError('');
     setSaving(false);
     setMotivoEstado('');
+    setConflicts([]);
     setItem(currentItem
       ? { ...currentItem, condicion: currentItem.condicion ?? 'Usado', fechaIngreso: currentItem.fechaIngreso?.toDate().toISOString().split('T')[0] ?? '' }
       : { nombre:'', categoria:CATEGORIAS[0], estado:'Disponible', condicion:'Nuevo', fechaIngreso:new Date().toISOString().split('T')[0], numeroSerial:'', numeroInventario:'', observaciones:'', personaEncargada:'' }
@@ -27,20 +31,20 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
   }));
   const estadoChanged = currentItem && item.estado !== currentItem.estado;
 
-  const findDuplicate = (field, label) => {
-    const value = item[field]?.trim();
-    if (!value) return null;
-    const dup = items.find(i => i.id !== currentItem?.id && i[field]?.trim().toLowerCase() === value.toLowerCase());
-    return dup ? `Ya existe un equipo con ese ${label} (${dup.nombre}).` : null;
-  };
-
-  const handleSave = async (e) => {
+  // Al enviar se revisa la duplicidad: si hay choque se muestra el aviso con
+  // el equipo culpable (puede estar dado de baja y no verse en el listado).
+  const handleSave = (e) => {
     e.preventDefault();
     setError('');
 
-    const dupError = findDuplicate('numeroInventario', 'número de inventario') || findDuplicate('numeroSerial', 'número de serial');
-    if (dupError) { setError(dupError); return; }
+    const found = findDuplicateConflicts(items, currentItem, item);
+    if (found.length > 0) { setConflicts(found); return; }
 
+    persist();
+  };
+
+  const persist = async () => {
+    setConflicts([]);
     setSaving(true);
     try {
       const data = { ...item };
@@ -62,6 +66,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} title={currentItem ? 'Modificar Equipo' : 'Añadir Nuevo Equipo'}>
       <form onSubmit={handleSave} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -135,6 +140,14 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
         </div>
       </form>
     </Modal>
+
+    <DuplicateWarningModal
+      isOpen={conflicts.length > 0}
+      onClose={() => setConflicts([])}
+      onConfirm={persist}
+      conflicts={conflicts}
+    />
+    </>
   );
 };
 
