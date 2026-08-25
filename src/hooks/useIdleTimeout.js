@@ -55,21 +55,16 @@ const useIdleTimeout = (onIdle, user, idleTime = 900_000, warningTime = 20_000) 
         : { expired, countdown: secondsLeft });
     };
 
-    // Cerrar o recargar la pestaña también cierra la sesión.
-    const handleUnload = () => onIdleRef.current?.();
-
     const interval = setInterval(check, TICK_MS);
     ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, markActivity, { passive: true }));
     // Al volver a la pestaña se recalcula de inmediato, sin esperar el tick.
     document.addEventListener('visibilitychange', check);
-    window.addEventListener('beforeunload', handleUnload);
     check();
 
     return () => {
       clearInterval(interval);
       ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, markActivity));
       document.removeEventListener('visibilitychange', check);
-      window.removeEventListener('beforeunload', handleUnload);
     };
   }, [user, idleTime, warningTime]);
 

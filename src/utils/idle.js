@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────
 //  src/utils/idle.js
 //  Lógica de inactividad, separada del hook para poder probarla.
-//  El aviso aparece `warningTime` antes del cierre: con 15 min de
-//  inactividad y 20 s de aviso, el modal sale al minuto 14:40 y la
-//  sesión se cierra exactamente al minuto 15.
+//  El aviso aparece `warningTime` antes del cierre: con 30 min de
+//  inactividad y 40 s de aviso, el modal sale al minuto 29:20 y la
+//  sesión se cierra exactamente al minuto 30.
 // ─────────────────────────────────────────────
 
 export function getIdleState(msSinceActivity, idleTime, warningTime) {

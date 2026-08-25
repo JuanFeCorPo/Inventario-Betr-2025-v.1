@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn, ShieldX } from 'lucide-react';
+import { LogIn, ShieldX, Eye, EyeOff } from 'lucide-react';
 import { LOGO_URL, LOGO_FALLBACK } from '../config/constants';
 
 const LoginScreen = ({ onLogin, accessError }) => {
@@ -7,6 +7,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -52,8 +53,15 @@ const LoginScreen = ({ onLogin, accessError }) => {
           <form onSubmit={handleLogin} className="space-y-4">
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="Correo electrónico" className={inputClass} required />
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="Contraseña" className={inputClass} required />
+            <div className="relative">
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="Contraseña" className={`${inputClass} pr-11`} required />
+              <button type="button" onClick={() => setShowPassword(p => !p)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-ink transition-colors">
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
             {error && (
               <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3">
