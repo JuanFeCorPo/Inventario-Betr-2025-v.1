@@ -2,8 +2,12 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { StatCard, StatusBadge, NewBadge, Dropdown } from '../components/ui';
 import {
   CheckCircle, PlusCircle, AlertTriangle,
-  Box, Users, Archive, LogOut, Eye, X, Wrench, Search,
-  Menu, Download, Upload, MoreVertical, FileSpreadsheet
+  Box, Users, Archive, LogOut, ChevronRight, X, Wrench, Search,
+  Menu, Download, Upload, MoreVertical, FileSpreadsheet,
+  Mouse, Monitor, Laptop, Cpu, Camera, Lightbulb, Headphones, Refrigerator,
+  Smartphone, Plug, BatteryCharging, PanelTop, Zap, Server, Package,
+  ArrowUp, ArrowDown, ChevronsUpDown,
+  Coffee, Cable, HardDrive, Mic, MemoryStick,
 } from 'lucide-react';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
@@ -14,18 +18,69 @@ import useInventory   from '../hooks/useInventory';
 import useEncargados  from '../hooks/useEncargados';
 import useDismissedAlerts from '../hooks/useDismissedAlerts';
 import { LOGO_URL, LOGO_FALLBACK } from '../config/constants';
-import { exportInventory } from '../utils/excel';
+import { exportInventory, normalize } from '../utils/excel';
 import { computeAlerts } from '../utils/alerts';
 import { isAlertDismissed } from '../utils/dismissedAlerts';
 import { countOverdueMaintenance } from '../utils/maintenance';
 import AlertsBell     from '../components/AlertsBell';
 import CategoryChart from '../components/CategoryChart';
 
+// ── Ícono por categoría (ayuda a escanear la lista de un vistazo) ──
+const CATEGORY_ICONS = {
+  'Periféricos':       Mouse,
+  'Monitores':         Monitor,
+  'Laptops':           Laptop,
+  'CPU':               Cpu,
+  'Cámaras':           Camera,
+  'Luces':             Lightbulb,
+  'Audio':             Headphones,
+  'Electrodomésticos': Refrigerator,
+  'Smartphones':       Smartphone,
+  'Adaptadores':       Plug,
+  'UPS':               BatteryCharging,
+  'Bases y Soportes':  PanelTop,
+  'Estabilizadores':   Zap,
+  'Servidores y Red':  Server,
+  'Otros':             Package,
+};
+// La categoría es muy genérica ("Otros", "Electrodomésticos") para elegir un
+// ícono representativo — antes de caer en el de categoría, se intenta
+// reconocer el equipo puntual por palabras clave en su nombre.
+const ITEM_ICON_RULES = [
+  { test: /destornillador|desarmador|kit de herramientas|\bherramienta/, icon: Wrench },
+  { test: /cafetera/,                                                    icon: Coffee },
+  { test: /extension|regleta|multitoma/,                                 icon: Cable },
+  { test: /disco duro|disco externo|\bhdd\b|\bssd\b/,                    icon: HardDrive },
+  { test: /micro ?sd|tarjeta de memoria|memoria.*sd/,                    icon: MemoryStick },
+  { test: /microfono/,                                                   icon: Mic },
+];
+
+const CategoryIcon = ({ categoria, nombre, ...props }) => {
+  const normNombre = normalize(nombre);
+  const rule = ITEM_ICON_RULES.find(({ test }) => test.test(normNombre));
+  const Icon = rule?.icon ?? CATEGORY_ICONS[categoria] ?? Package;
+  return <Icon {...props} />;
+};
+
+// ── Columnas ordenables de la tabla ──────────
+const TABLE_COLUMNS = [
+  { key: 'nombre',           label: 'Nombre' },
+  { key: 'estado',           label: 'Estado', center: true },
+  { key: 'numeroInventario', label: 'Nº Inv' },
+  { key: 'categoria',        label: 'Categoría' },
+  { key: 'personaEncargada', label: 'Encargado', responsive: 'hidden lg:table-cell' },
+];
+
 // ── Fila de tabla (desktop) ──────────────────
 const EquipoRow = ({ item, onAction }) => (
   <tr className="border-b border-brand-border hover:bg-brand-bg/60 transition-colors cursor-pointer"
     onClick={() => onAction('preview', item)}>
-    <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm min-w-[160px]">{item.nombre}</td>
+    <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm min-w-[160px]">
+      <div className="flex items-center gap-2">
+        <CategoryIcon categoria={item.categoria} nombre={item.nombre} size={15} className="text-brand-gray flex-shrink-0" />
+        <span className="truncate">{item.nombre}</span>
+      </div>
+    </td>
     <td className="px-4 py-3.5 text-center">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
         <StatusBadge status={item.estado} />
@@ -34,9 +89,10 @@ const EquipoRow = ({ item, onAction }) => (
     </td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.personaEncargada || '—'}</td>
-    <td className="px-4 py-3.5 text-center" aria-label={`Ver detalle de ${item.nombre}`}>
-      <Eye size={15} className="text-brand-gray inline-block" />
+    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">
+      {item.personaEncargada || (
+        <span className="italic text-xs text-brand-gray/80 bg-brand-bg border border-brand-border px-2 py-0.5 rounded-full">Sin asignar</span>
+      )}
     </td>
   </tr>
 );
@@ -51,11 +107,16 @@ const EquipoCard = ({ item, onAction }) => (
         {item.condicion === 'Nuevo' && <NewBadge />}
       </div>
       <div className="min-w-0">
-        <p className="font-semibold text-brand-ink text-sm truncate">{item.nombre}</p>
-        <p className="text-xs text-brand-gray font-mono">{item.numeroInventario}</p>
+        <div className="flex items-center gap-1.5">
+          <CategoryIcon categoria={item.categoria} nombre={item.nombre} size={13} className="text-brand-gray flex-shrink-0" />
+          <p className="font-semibold text-brand-ink text-sm truncate">{item.nombre}</p>
+        </div>
+        <p className="inline-block text-[11px] font-mono font-semibold text-brand-slate bg-brand-bg px-1.5 py-0.5 rounded mt-1">
+          {item.numeroInventario}
+        </p>
       </div>
     </div>
-    <Eye size={16} className="text-brand-gray flex-shrink-0" />
+    <ChevronRight size={16} className="text-brand-gray flex-shrink-0" />
   </button>
 );
 
@@ -115,10 +176,20 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const [filterCategory, setFilterCategory] = useState('Todos');
   const [filterStatus,   setFilterStatus]   = useState('Activos');
   const [mobileFilters,  setMobileFilters]  = useState(false);
+  const [sortConfig,     setSortConfig]     = useState({ key: 'nombre', direction: 'asc' });
+
+  const toggleSort = (key) => setSortConfig(prev =>
+    prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+  );
 
   const openModal  = (type, data = null) => setModal({ type, data });
   const closeModal = () => setModal({ type: null, data: null });
-  const handleSave = async (data, motivoEstado) => { await saveItem(data, motivoEstado); closeModal(); };
+  // Si venías de editar desde el detalle, vuelve ahí en vez de mandarte a la
+  // lista completa — con muchos equipos, tener que rebuscarlo era tedioso.
+  const handleSave = async (data, motivoEstado) => {
+    await saveItem(data, motivoEstado);
+    modal.type === 'edit' ? openModal('preview', data) : closeModal();
+  };
   const handleDeactivate = async (reason, fecha) => { await deactivateItem(modal.data.id, reason, fecha); closeModal(); };
   const handleDelete     = async ()              => { await deleteItem(modal.data.id); closeModal(); };
 
@@ -166,8 +237,13 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
       const statusOk = filterStatus === 'Todos' ? true : filterStatus === 'Activos' ? item.estado !== 'De Baja' : item.estado === filterStatus;
       const searchOk = !term || [item.nombre, item.numeroSerial, item.numeroInventario, item.personaEncargada].some(f => f?.toLowerCase().includes(term));
       return catOk && statusOk && searchOk;
-    }).sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [items, filterCategory, filterStatus, searchTerm]);
+    }).sort((a, b) => {
+      const dir = sortConfig.direction === 'asc' ? 1 : -1;
+      const va  = (a[sortConfig.key] ?? '').toString();
+      const vb  = (b[sortConfig.key] ?? '').toString();
+      return va.localeCompare(vb) * dir;
+    });
+  }, [items, filterCategory, filterStatus, searchTerm, sortConfig]);
 
   const categoryCount = useMemo(
     () => filterCategory === 'Todos' ? null : items.filter(i => i.categoria === filterCategory).length,
@@ -340,12 +416,16 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-brand-border bg-brand-bg/50">
-                  {['Nombre','Estado','Nº Inv','Categoría','Encargado',''].map((h, i) => {
-                    const responsive = { 4: 'hidden lg:table-cell' }[i] ?? '';
-                    const center     = (i === 1 || i === 5) ? 'text-center' : '';
+                  {TABLE_COLUMNS.map(({ key, label, center, responsive }) => {
+                    const active   = sortConfig.key === key;
+                    const SortIcon = active ? (sortConfig.direction === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
                     return (
-                      <th key={i} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${center} ${responsive}`}>
-                        {h}
+                      <th key={key} className={`px-4 py-3.5 text-xs font-semibold text-brand-gray uppercase tracking-wider whitespace-nowrap ${center ? 'text-center' : ''} ${responsive ?? ''}`}>
+                        <button type="button" onClick={() => toggleSort(key)}
+                          className={`flex items-center gap-1 hover:text-brand-ink transition-colors ${center ? 'mx-auto' : ''} ${active ? 'text-brand-ink' : ''}`}>
+                          {label}
+                          <SortIcon size={12} className={active ? 'text-brand-orange' : 'text-brand-gray/50'} />
+                        </button>
                       </th>
                     );
                   })}
@@ -353,14 +433,14 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="6" className="text-center py-16 text-brand-gray">
+                  <tr><td colSpan="5" className="text-center py-16 text-brand-gray">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-6 h-6 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
                       <span className="text-sm">Cargando equipos…</span>
                     </div>
                   </td></tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan="6" className="text-center py-16 text-brand-gray text-sm italic">
+                  <tr><td colSpan="5" className="text-center py-16 text-brand-gray text-sm italic">
                     No se encontraron equipos con los filtros actuales.
                   </td></tr>
                 ) : filteredItems.map(item => (

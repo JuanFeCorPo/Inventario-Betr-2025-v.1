@@ -13,6 +13,18 @@ export const CATEGORIAS = [
 export const CATEGORIAS_CON_MANTENIMIENTO = ['Laptops', 'CPU'];
 export const FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT = 6;
 
+// Categorías con especificaciones técnicas (componentes) editables
+export const CATEGORIAS_CON_ESPECIFICACIONES = ['Laptops', 'CPU'];
+export const CAMPOS_ESPECIFICACIONES = [
+  { key: 'marca',            label: 'Marca' },
+  { key: 'modelo',           label: 'Modelo' },
+  { key: 'procesador',       label: 'Procesador' },
+  { key: 'ram',              label: 'Memoria RAM' },
+  { key: 'almacenamiento',   label: 'Almacenamiento' },
+  { key: 'tarjetaGrafica',   label: 'Tarjeta Gráfica' },
+  { key: 'sistemaOperativo', label: 'Sistema Operativo' },
+];
+
 export const ESTADOS = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio'];
 
 // Nuevo = nunca ha sido asignado a nadie. Usado = ya tuvo al menos un uso,
@@ -30,5 +42,5 @@ export const ESTADO_STYLES = {
 
 export const LOGO_URL      = 'https://i.postimg.cc/L6hypBbp/128x128.png';
 export const LOGO_FALLBACK = 'https://placehold.co/128x128/5E6A74/FFFFFF?text=B';
-export const IDLE_TIME_MS    = 1_800_000; // 30 minutos
+export const IDLE_TIME_MS    = 900_000;   // 15 minutos
 export const IDLE_WARNING_MS = 40_000;    // aviso 40 s antes del cierre

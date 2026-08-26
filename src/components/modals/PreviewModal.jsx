@@ -4,6 +4,7 @@ import HistoryTimeline from '../HistoryTimeline';
 import { exportItemHistory } from '../../utils/excel';
 import useEquipoHistorial from '../../hooks/useEquipoHistorial';
 import { getMaintenanceInfo } from '../../utils/maintenance';
+import { CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
 import { Edit, Archive, Trash2, StickyNote, Download, Loader2 } from 'lucide-react';
 
 const Field = ({ label, value }) => (
@@ -78,6 +79,18 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
             <Field label="Mantenimiento" value="Excluido (sin uso)" />
           )}
         </div>
+
+        {/* Especificaciones técnicas */}
+        {CATEGORIAS_CON_ESPECIFICACIONES.includes(item.categoria) && (
+          <div>
+            <p className="text-xs text-brand-gray mb-1">Especificaciones técnicas</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-brand-bg/60 border border-brand-border rounded-xl p-4">
+              {CAMPOS_ESPECIFICACIONES.map(({ key, label }) => (
+                <Field key={key} label={label} value={item[key]} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Observaciones */}
         <div>
