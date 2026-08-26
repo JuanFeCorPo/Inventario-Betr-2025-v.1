@@ -7,7 +7,7 @@ import {
   Mouse, Monitor, Laptop, Cpu, Camera, Lightbulb, Headphones, Refrigerator,
   Smartphone, Plug, BatteryCharging, PanelTop, Zap, Server, Package,
   ArrowUp, ArrowDown, ChevronsUpDown,
-  Coffee, Cable, HardDrive, Mic, MemoryStick,
+  Coffee, Cable, HardDrive, Mic, MemoryStick, Keyboard,
 } from 'lucide-react';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
@@ -53,6 +53,7 @@ const ITEM_ICON_RULES = [
   { test: /disco duro|disco externo|\bhdd\b|\bssd\b/,                    icon: HardDrive },
   { test: /micro ?sd|tarjeta de memoria|memoria.*sd/,                    icon: MemoryStick },
   { test: /microfono/,                                                   icon: Mic },
+  { test: /teclado/,                                                     icon: Keyboard },
 ];
 
 const CategoryIcon = ({ categoria, nombre, ...props }) => {
