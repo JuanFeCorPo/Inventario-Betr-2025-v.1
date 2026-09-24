@@ -23,7 +23,8 @@ import { computeAlerts } from '../utils/alerts';
 import { isAlertDismissed } from '../utils/dismissedAlerts';
 import { countOverdueMaintenance } from '../utils/maintenance';
 import AlertsBell     from '../components/AlertsBell';
-import CategoryChart from '../components/CategoryChart';
+import EquipmentAgeChart from '../components/EquipmentAgeChart';
+import UpcomingMaintenanceCard from '../components/UpcomingMaintenanceCard';
 
 // ── Ícono por categoría (ayuda a escanear la lista de un vistazo) ──
 const CATEGORY_ICONS = {
@@ -336,9 +337,10 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         {/* ── Contenido + barra lateral del gráfico ── */}
         <div className="grid grid-cols-1 2xl:grid-cols-[1fr_300px] gap-4 items-start">
 
-        {/* Gráfico: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas muy anchas */}
-        <div className="2xl:col-start-2 2xl:row-start-1">
-          <CategoryChart items={items} onSelectCategory={(categoria) => { setFilterCategory(categoria); setFilterStatus('Todos'); }} />
+        {/* Gráfico + mantenimientos: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas muy anchas */}
+        <div className="2xl:col-start-2 2xl:row-start-1 space-y-4">
+          <EquipmentAgeChart items={items} />
+          <UpcomingMaintenanceCard items={items} onNavigate={onNavigate} />
         </div>
 
         <div className="2xl:col-start-1 2xl:row-start-1 min-w-0">

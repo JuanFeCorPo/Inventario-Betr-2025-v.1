@@ -65,5 +65,19 @@ export function computeAlerts(items) {
     });
   }
 
+  // 4) Equipos "En Uso" sin persona a cargo asignada (dato incompleto que
+  // dificulta saber a quién reclamar el equipo). No aplica a "Disponible":
+  // ahí es normal que todavía no haya un responsable.
+  const sinResponsable = items.filter(i => i.estado === 'En Uso' && !i.personaEncargada?.trim()).length;
+  if (sinResponsable > 0) {
+    alerts.push({
+      id: 'unassigned-in-use',
+      severity: 'medium',
+      message: `${sinResponsable} equipo${sinResponsable !== 1 ? 's' : ''} en uso sin persona a cargo asignada.`,
+      filterCategory: 'Todos',
+      filterStatus: 'En Uso',
+    });
+  }
+
   return alerts;
 }

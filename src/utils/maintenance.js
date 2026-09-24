@@ -65,6 +65,16 @@ export function groupMaintenanceByUrgency(items, now = new Date()) {
     .filter(grupo => grupo.rows.length > 0);
 }
 
+// Los N mantenimientos más urgentes (vencidos primero), para mostrar un
+// adelanto en el dashboard sin tener que entrar a la pantalla completa.
+export function getUpcomingMaintenance(items, limit = 5, now = new Date()) {
+  return items
+    .map(item => ({ item, info: getMaintenanceInfo(item, now) }))
+    .filter(({ info }) => info !== null)
+    .sort((a, b) => a.info.proximaFecha - b.info.proximaFecha)
+    .slice(0, limit);
+}
+
 export function countOverdueMaintenance(items, now = new Date()) {
   return items.reduce((count, item) => {
     const info = getMaintenanceInfo(item, now);

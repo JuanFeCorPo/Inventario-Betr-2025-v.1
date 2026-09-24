@@ -73,4 +73,21 @@ describe('computeAlerts', () => {
     expect(alerts).toHaveLength(2);
     expect(alerts.map(a => a.id).sort()).toEqual(['oos-CPU', 'stale-items']);
   });
+
+  it('avisa de equipos en uso sin persona a cargo asignada', () => {
+    const items = [
+      makeItem({ estado: 'En Uso', personaEncargada: '' }),
+      makeItem({ estado: 'En Uso', personaEncargada: '   ' }),
+      makeItem({ estado: 'En Uso', personaEncargada: 'Ana' }),
+    ];
+    const alerts = computeAlerts(items);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ id: 'unassigned-in-use', severity: 'medium', filterStatus: 'En Uso' });
+    expect(alerts[0].message).toContain('2 equipos');
+  });
+
+  it('no avisa de "sin persona a cargo" para equipos Disponibles (es normal ahí)', () => {
+    const items = [makeItem({ estado: 'Disponible', personaEncargada: '' })];
+    expect(computeAlerts(items)).toEqual([]);
+  });
 });

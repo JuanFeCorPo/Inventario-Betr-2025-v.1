@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance } from './maintenance';
+import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance, getUpcomingMaintenance } from './maintenance';
 
 const ts = (date) => ({ toDate: () => date });
 const daysAgo = (n) => ts(new Date(Date.now() - n * 86_400_000));
@@ -106,5 +106,20 @@ describe('countOverdueMaintenance', () => {
       makeItem({ categoria: 'Periféricos' }),
     ];
     expect(countOverdueMaintenance(items, NOW)).toBe(1);
+  });
+});
+
+describe('getUpcomingMaintenance', () => {
+  it('devuelve solo los equipos aplicables, ordenados por fecha más próxima', () => {
+    const masVencido  = makeItem({ nombre: 'A', ultimoMantenimiento: daysAgo(300) });
+    const menosVencido = makeItem({ nombre: 'B', ultimoMantenimiento: daysAgo(190) });
+    const noAplica    = makeItem({ nombre: 'C', categoria: 'Periféricos' });
+    const resultado = getUpcomingMaintenance([noAplica, menosVencido, masVencido], 5, NOW);
+    expect(resultado.map(r => r.item.nombre)).toEqual(['A', 'B']);
+  });
+
+  it('respeta el límite pedido', () => {
+    const items = Array.from({ length: 8 }, (_, i) => makeItem({ nombre: `Equipo ${i}`, ultimoMantenimiento: daysAgo(180 + i) }));
+    expect(getUpcomingMaintenance(items, 3, NOW)).toHaveLength(3);
   });
 });
