@@ -64,6 +64,7 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-brand-bg/60 border border-brand-border rounded-xl p-4">
           <Field label="Categoría" value={item.categoria} />
           <Field label="Condición" value={item.condicion ?? 'Usado'} />
+          <Field label="N° Inventario" value={item.numeroInventario} />
           <Field label="N° Serial" value={item.numeroSerial} />
           <Field label="Persona Encargada" value={item.personaEncargada} />
           <Field label="Fecha de Ingreso" value={item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toLocaleDateString() : '—'} />
