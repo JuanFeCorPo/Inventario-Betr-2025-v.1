@@ -14,6 +14,7 @@ const monthAgoStr = () => {
 const ReportModal = ({ isOpen, onClose, db, items }) => {
   const [start, setStart]     = useState(monthAgoStr());
   const [end, setEnd]         = useState(todayStr());
+  const [format, setFormat]   = useState('xlsx');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [result, setResult]   = useState(null); // cantidad de movimientos del último reporte generado
@@ -28,7 +29,7 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
     setLoading(true);
     try {
       const entries = await gatherPeriodEntries(db, items, start, end);
-      await exportPeriodReport(entries, start, end);
+      await exportPeriodReport(entries, start, end, format);
       setResult(entries.length);
     } catch (err) {
       console.error(err);
@@ -42,7 +43,7 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="Generar Reporte por Periodo" size="sm">
       <div className="space-y-4">
         <p className="text-brand-slate text-sm">
-          Descarga un Excel con todos los movimientos del inventario (altas, ediciones, bajas, notas) en el rango de fechas que elijas.
+          Descarga todos los movimientos del inventario (altas, ediciones, bajas, notas) en el rango de fechas y formato que elijas.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -52,6 +53,22 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
           <div>
             <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Hasta</label>
             <input type="date" value={end} onChange={e => setEnd(e.target.value)} className={fieldClass} />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Formato</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'csv', label: 'CSV (.csv)' }].map(opt => (
+              <button key={opt.value} type="button" onClick={() => setFormat(opt.value)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                  format === opt.value
+                    ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
+                    : 'bg-brand-bg border-brand-border text-brand-slate hover:border-brand-orange/40'
+                }`}>
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

@@ -120,7 +120,9 @@ export async function exportItemHistory(item) {
 
 // ── Reporte por periodo (movimientos de todos los equipos) ─
 // `entries`: [{ timestamp, equipoNombre, equipoInv, user, action, changes }]
-export async function exportPeriodReport(entries, startDate, endDate) {
+// `format`: 'xlsx' | 'csv' — CSV solo puede llevar una hoja, así que se
+// exporta únicamente "Movimientos" (no hay una segunda hoja que perder).
+export async function exportPeriodReport(entries, startDate, endDate, format = 'xlsx') {
   const XLSX = await loadXLSX();
   const sorted = [...entries].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
   const rows = sorted.map(e => ({
@@ -137,7 +139,8 @@ export async function exportPeriodReport(entries, startDate, endDate) {
   ws['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 16 }, { wch: 25 }, { wch: 40 }, { wch: 55 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
 
-  XLSX.writeFile(wb, `reporte_inventario_${startDate}_a_${endDate}.xlsx`);
+  const filename = `reporte_inventario_${startDate}_a_${endDate}.${format}`;
+  XLSX.writeFile(wb, filename, format === 'csv' ? { bookType: 'csv' } : undefined);
 }
 
 // ── Importar ──────────────────────────────────
