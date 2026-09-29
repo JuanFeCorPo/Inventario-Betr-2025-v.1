@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { StatCard, StatusBadge, NewBadge, Dropdown } from '../components/ui';
 import {
   CheckCircle, PlusCircle, AlertTriangle,
-  Box, Users, Archive, LogOut, ChevronRight, X, Wrench, Search,
+  Box, Users, Archive, LogOut, ChevronRight, ChevronDown, X, Wrench, Search,
   Menu, Download, Upload, MoreVertical, FileSpreadsheet,
   Mouse, Monitor, Laptop, Cpu, Camera, Lightbulb, Headphones, Refrigerator,
   Smartphone, Plug, BatteryCharging, PanelTop, Zap, Server, Package,
@@ -165,6 +165,45 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
   );
 };
 
+// ── Menú "Más" (desktop) — agrupa las acciones menos frecuentes para que
+// el header no sea una fila de seis botones sueltos ──
+const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const row = (icon, label, onClick, colorClass) => (
+    <button type="button" onClick={() => { setOpen(false); onClick(); }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-ink hover:bg-brand-bg rounded-xl transition-colors text-left">
+      <span className={`w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 ${colorClass}`}>{icon}</span>
+      {label}
+    </button>
+  );
+
+  return (
+    <div ref={ref} className="relative hidden sm:block">
+      <button type="button" onClick={() => setOpen(p => !p)} aria-expanded={open} aria-label="Más acciones"
+        className="flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+        Más
+        <ChevronDown size={14} className={`text-brand-gray transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-50 mt-2 w-56 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in p-2 space-y-0.5">
+          {isAdmin && row(<Users size={15} />, 'Usuarios', onUsers, 'bg-slate-100 text-slate-600')}
+          {row(<Download size={15} />, 'Exportar', onExport, 'bg-blue-100 text-blue-600')}
+          {isAdmin && row(<Upload size={15} />, 'Importar', onImport, 'bg-emerald-100 text-emerald-600')}
+          {isAdmin && row(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport, 'bg-brand-orange/10 text-brand-orange')}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Dashboard principal ──────────────────────
 const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const isAdmin = user.role === 'Administrador';
@@ -280,12 +319,6 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <AlertsBell alerts={alerts} onGoTo={goToAlert} onDismiss={dismissAlert} />
             <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
               onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
-            {isAdmin && (
-              <button onClick={() => onNavigate('users')}
-                className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
-                <Users size={15} /> Usuarios
-              </button>
-            )}
             <button onClick={() => onNavigate('maintenance')} aria-label="Ver mantenimientos preventivos" title="Mantenimientos preventivos"
               className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm relative">
               <Wrench size={15} /> Mantenimientos
@@ -295,22 +328,8 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                 </span>
               )}
             </button>
-            <button onClick={() => exportInventory(items)} aria-label="Exportar inventario a Excel" title="Exportar a Excel"
-              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
-              <Download size={15} /> Exportar
-            </button>
-            {isAdmin && (
-              <button onClick={() => setShowImport(true)} aria-label="Importar inventario desde Excel" title="Importar desde Excel"
-                className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
-                <Upload size={15} /> Importar
-              </button>
-            )}
-            {isAdmin && (
-              <button onClick={() => setShowReport(true)} aria-label="Generar reporte por periodo" title="Generar reporte por periodo"
-                className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
-                <FileSpreadsheet size={15} /> Reporte
-              </button>
-            )}
+            <MoreMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')}
+              onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             <button onClick={() => openModal('add')} aria-label="Añadir equipo"
               className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-3 sm:px-4 py-2.5 rounded-xl transition-all shadow-md hover:shadow-brand-orange/30">
               <PlusCircle size={15} />
