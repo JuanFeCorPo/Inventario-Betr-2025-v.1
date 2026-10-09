@@ -1,4 +1,5 @@
 import { CATEGORIAS, ESTADOS, CONDICIONES } from '../config/constants';
+import { formatFechaHora } from './format';
 
 // La librería de Excel (xlsx) pesa bastante y la mayoría de las visitas
 // nunca exportan/importan nada — se carga solo cuando de verdad se usa,
@@ -105,7 +106,7 @@ export async function exportItemHistory(item) {
 
   const sorted = [...(item.history ?? [])].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
   const historyRows = sorted.map(h => ({
-    'Fecha':   h.timestamp?.toDate ? h.timestamp.toDate().toLocaleString() : '',
+    'Fecha':   h.timestamp?.toDate ? formatFechaHora(h.timestamp.toDate()) : '',
     'Usuario': sanitizeCell(h.user),
     'Acción':  sanitizeCell(h.action),
     'Cambios': sanitizeCell((h.changes ?? []).map(c => `${c.field}: '${c.from}' → '${c.to}'`).join(' | ')),
@@ -126,7 +127,7 @@ export async function exportPeriodReport(entries, startDate, endDate, format = '
   const XLSX = await loadXLSX();
   const sorted = [...entries].sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
   const rows = sorted.map(e => ({
-    'Fecha':         e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString() : '',
+    'Fecha':         e.timestamp?.toDate ? formatFechaHora(e.timestamp.toDate()) : '',
     'Equipo':        e.equipoNombre ? sanitizeCell(e.equipoNombre) : '(equipo eliminado)',
     'N° Inventario': sanitizeCell(e.equipoInv ?? '—'),
     'Usuario':       sanitizeCell(e.user),

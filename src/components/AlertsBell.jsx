@@ -1,19 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
 import { AlertTriangle, Clock, X, Bell } from 'lucide-react';
+import { usePopover } from '../hooks/usePopover';
 
 // `alerts` ya viene filtrada por el padre (sin las descartadas en los
 // últimos 15 días) — ver useDismissedAlerts / utils/dismissedAlerts.
 // Vive como icono en el header en vez de un banner fijo: menos invasivo,
 // se revisa solo cuando el usuario quiere.
 const AlertsBell = ({ alerts, onGoTo, onDismiss }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const { open, setOpen, ref, shown } = usePopover();
 
   if (alerts.length === 0) return null;
   const hasHigh = alerts.some(a => a.severity === 'high');
@@ -21,15 +14,15 @@ const AlertsBell = ({ alerts, onGoTo, onDismiss }) => {
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Alertas del inventario" title="Alertas del inventario"
-        className="relative p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition-all shadow-sm hover:shadow-md">
+        className="relative p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition shadow-sm hover:shadow-md">
         <Bell size={16} />
         <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white rounded-full ${hasHigh ? 'bg-rose-500' : 'bg-amber-500'}`}>
           {alerts.length}
         </span>
       </button>
 
-      {open && (
-        <div className="fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 z-50 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in">
+      {shown && (
+        <div className={`fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 z-50 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border bg-brand-bg/50">
             <Bell size={14} className="text-brand-orange" />
             <p className="text-sm font-semibold text-brand-ink">Alertas del inventario</p>

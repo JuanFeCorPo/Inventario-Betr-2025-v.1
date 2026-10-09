@@ -123,3 +123,29 @@ describe('getUpcomingMaintenance', () => {
     expect(getUpcomingMaintenance(items, 3, NOW)).toHaveLength(3);
   });
 });
+
+describe('getMaintenanceInfo — días de calendario', () => {
+  // Último mantenimiento hace 6 meses exactos a mediodía: vence hoy.
+  const venceHoy = (now) => {
+    const base = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate(), 12, 0, 0);
+    return { categoria: 'Laptops', estado: 'En Uso', ultimoMantenimiento: { toDate: () => base } };
+  };
+
+  it('vence hoy da 0 días aunque ya haya pasado la hora', () => {
+    const tarde = new Date(2026, 9, 9, 18, 30);
+    const info = getMaintenanceInfo(venceHoy(tarde), tarde);
+    expect(info.diasRestantes).toBe(0);
+    expect(info.urgencia).toBe('esta-semana');
+  });
+
+  it('vence hoy da 0 días también en la mañana', () => {
+    const manana = new Date(2026, 9, 9, 7, 0);
+    expect(getMaintenanceInfo(venceHoy(manana), manana).diasRestantes).toBe(0);
+  });
+
+  it('ayer cuenta como vencido hace 1 día', () => {
+    const now = new Date(2026, 9, 10, 9, 0);
+    const item = venceHoy(new Date(2026, 9, 9));
+    expect(getMaintenanceInfo(item, now).diasRestantes).toBe(-1);
+  });
+});

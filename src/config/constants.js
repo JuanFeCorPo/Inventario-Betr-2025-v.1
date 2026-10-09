@@ -40,6 +40,16 @@ export const ESTADO_STYLES = {
   'De Baja':            'bg-gray-100     text-gray-500     border border-gray-200',
 };
 
+// Punto de color por estado (listas densas, mosaico de categorías)
+export const STATUS_DOT = {
+  'Disponible':        'bg-emerald-500',
+  'En Uso':            'bg-amber-500',
+  'En Mantenimiento':  'bg-violet-500',
+  'Fuera de Servicio': 'bg-rose-500',
+  'De Baja':           'bg-gray-400',
+};
+export const STATUS_ORDER = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio', 'De Baja'];
+
 export const LOGO_URL      = 'https://i.postimg.cc/L6hypBbp/128x128.png';
 export const LOGO_FALLBACK = 'https://placehold.co/128x128/5E6A74/FFFFFF?text=B';
 export const IDLE_TIME_MS    = 900_000;   // 15 minutos

@@ -7,7 +7,8 @@ import {
   ToggleLeft, ToggleRight, Loader2, UserCheck,
   UserX, UserPlus, X, History, AlertTriangle
 } from 'lucide-react';
-import { Button } from '../components/ui';
+import { Button, Modal, EmptyState } from '../components/ui';
+import { fieldClassSm } from '../components/ui/fieldClasses';
 import { HistoryModal } from '../components/modals/OtherModals';
 
 const ROLES = ['Lector', 'Administrador'];
@@ -48,63 +49,55 @@ const AddUserModal = ({ isOpen, onClose, onAdd }) => {
     }
   };
 
-  if (!isOpen) return null;
-  const f = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all text-sm';
+  const f = fieldClassSm;
 
   return (
-    <div className="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-modal-in">
-      <div className="bg-white border border-brand-border rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
-        <button onClick={handleClose} aria-label="Cerrar" className="absolute top-4 right-4 text-brand-gray hover:text-brand-ink p-1 rounded-lg hover:bg-brand-bg transition-colors">
-          <X size={18} />
-        </button>
-        <h2 className="text-lg font-bold text-brand-ink mb-1">Registrar Usuario</h2>
-        <p className="text-xs text-brand-gray mb-6">
-          Ingresa el UID y email del usuario que creaste en Firebase Auth.
-          Puedes encontrar el UID en <span className="font-medium text-brand-ink">Firebase Console → Authentication → Users</span>.
-        </p>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Registrar Usuario" size="sm">
+      <p className="text-xs text-brand-gray -mt-4 mb-6" title="El UID está en Firebase Console → Authentication → Users">
+        UID y email del usuario creado en Firebase Auth.
+      </p>
 
-        {/* Feedback */}
-        {result === 'ok' && (
-          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-2">
-            <UserCheck size={16} className="text-emerald-600 flex-shrink-0" />
-            <p className="text-emerald-700 text-sm font-medium">Usuario registrado correctamente.</p>
-          </div>
-        )}
-        {result === 'error' && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center gap-2">
-            <UserX size={16} className="text-rose-600 flex-shrink-0" />
-            <p className="text-rose-700 text-sm">No se pudo registrar. Verifica que el UID sea correcto y que tengas permisos de Administrador.</p>
-          </div>
-        )}
+      {/* Feedback */}
+      {result === 'ok' && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <UserCheck size={16} className="text-emerald-600 flex-shrink-0" />
+          <p className="text-emerald-700 text-sm font-medium">Usuario registrado correctamente.</p>
+        </div>
+      )}
+      {result === 'error' && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <UserX size={16} className="text-rose-600 flex-shrink-0" />
+          <p className="text-rose-700 text-sm">No se pudo registrar. Verifica que el UID sea correcto y que tengas permisos de Administrador.</p>
+        </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-brand-slate mb-1.5 block">UID de Firebase</label>
-            <input value={uid} onChange={e => setUid(e.target.value)}
-              placeholder="Ej: abc123xyz..." className={f} required disabled={saving || result === 'ok'} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="usuario@empresa.com" className={f} required disabled={saving || result === 'ok'} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Rol</label>
-            <select value={role} onChange={e => setRole(e.target.value)} className={f} disabled={saving || result === 'ok'}>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" type="button" onClick={handleClose} disabled={saving}>Cancelar</Button>
-            <Button variant="primary" type="submit" disabled={saving || result === 'ok'}
-              className="flex items-center gap-2">
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              {saving ? 'Registrando…' : 'Registrar'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">UID de Firebase</label>
+          <input value={uid} onChange={e => setUid(e.target.value)}
+            placeholder="Ej: abc123xyz..." className={f} required disabled={saving || result === 'ok'} />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Email</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="usuario@empresa.com" className={f} required disabled={saving || result === 'ok'} />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Rol</label>
+          <select value={role} onChange={e => setRole(e.target.value)} className={f} disabled={saving || result === 'ok'}>
+            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="secondary" type="button" onClick={handleClose} disabled={saving}>Cancelar</Button>
+          <Button variant="primary" type="submit" disabled={saving || result === 'ok'}
+            className="flex items-center gap-2">
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            {saving ? 'Registrando…' : 'Registrar'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 
@@ -168,7 +161,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
 
   return (
     <div className="min-h-screen bg-brand-bg font-sans">
-      <div className="fixed top-0 right-0 w-[600px] h-[400px] bg-brand-orange/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed inset-0 bg-glow pointer-events-none" />
 
       <AddUserModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={addUser} />
 
@@ -177,8 +170,8 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
         {/* Header */}
         <header className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <button onClick={onBack}
-              className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition-all shadow-sm text-brand-slate hover:text-brand-ink">
+            <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
+              className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition shadow-sm text-brand-slate hover:text-brand-ink">
               <ArrowLeft size={18} />
             </button>
             <div>
@@ -186,8 +179,8 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
               <p className="text-xs text-brand-gray mt-0.5">Solo los usuarios registrados aquí pueden acceder al sistema</p>
             </div>
           </div>
-          <button onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
+          <button onClick={() => setShowAddModal(true)} aria-label="Registrar usuario"
+            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
             <UserPlus size={15} />
             <span className="hidden sm:inline">Registrar Usuario</span>
           </button>
@@ -195,7 +188,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
 
         {/* Error de acción */}
         {pageError && (
-          <div className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3">
+          <div className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 animate-reveal">
             <AlertTriangle size={18} className="text-rose-500 flex-shrink-0 mt-0.5" />
             <p className="text-rose-700 text-sm flex-1">{pageError}</p>
             <button onClick={() => setPageError('')} className="text-rose-400 hover:text-rose-600 p-0.5">
@@ -210,9 +203,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
           <div className="text-sm">
             <p className="font-semibold text-brand-ink">Acceso controlado</p>
             <p className="text-brand-slate mt-0.5">
-              Solo los usuarios registrados en esta lista pueden entrar al sistema.
-              Primero crea el usuario en <span className="font-medium text-brand-ink">Firebase Console → Authentication</span>,
-              luego regístralo aquí con el botón <span className="font-medium text-brand-ink">Registrar Usuario</span> usando su UID.
+              Créalo en <span className="font-medium text-brand-ink">Firebase → Authentication</span> y regístralo aquí con su UID.
             </p>
           </div>
         </div>
@@ -232,10 +223,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
               <span className="text-sm">Cargando usuarios…</span>
             </div>
           ) : users.length === 0 ? (
-            <div className="text-center py-16 text-brand-gray">
-              <Users size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm italic">No hay usuarios registrados aún.</p>
-            </div>
+            <EmptyState icon={<Users size={32} />} title="No hay usuarios registrados aún." />
           ) : (
             <ul className="divide-y divide-brand-border">
               {users.map(user => {
@@ -259,19 +247,19 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <button onClick={() => setHistoryUser(user)}
-                          className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg font-medium transition-all">
+                          className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg font-medium transition">
                           <History size={12} /> Historial
                         </button>
                         {!isSelf && (<>
                           <button onClick={() => toggleRole(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : undefined}
-                            className="flex items-center gap-1.5 text-xs bg-brand-bg hover:bg-brand-border border border-brand-border text-brand-slate px-3 py-2 rounded-lg font-medium transition-all disabled:opacity-40">
+                            className="flex items-center gap-1.5 text-xs bg-brand-bg hover:bg-brand-border border border-brand-border text-brand-slate px-3 py-2 rounded-lg font-medium transition disabled:opacity-40">
                             {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Shield size={12} />}
                             Cambiar rol
                           </button>
                           <button onClick={() => toggleActive(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : undefined}
-                            className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition-all disabled:opacity-40 border
+                            className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition disabled:opacity-40 border
                               ${isActive ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
                             {isActive ? <UserX size={12} /> : <UserCheck size={12} />}
                             {isActive ? 'Desactivar' : 'Activar'}
@@ -296,7 +284,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                         <button onClick={() => setHistoryUser(user)}
                           title="Ver historial"
                           aria-label={`Ver historial de ${user.email}`}
-                          className="p-2 rounded-lg text-brand-slate hover:text-blue-600 hover:bg-blue-50 transition-all">
+                          className="p-2 rounded-lg text-brand-slate hover:text-blue-600 hover:bg-blue-50 transition">
                           <History size={15} />
                         </button>
                         {isSelf ? (
@@ -305,13 +293,13 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                           <button onClick={() => toggleRole(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : `Cambiar a ${user.role === 'Administrador' ? 'Lector' : 'Administrador'}`}
                             aria-label={`Cambiar rol de ${user.email}`}
-                            className="p-2 rounded-lg text-brand-slate hover:text-brand-orange hover:bg-brand-orange/10 transition-all disabled:opacity-40">
+                            className="p-2 rounded-lg text-brand-slate hover:text-brand-orange hover:bg-brand-orange/10 transition disabled:opacity-40">
                             {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Shield size={15} />}
                           </button>
                           <button onClick={() => toggleActive(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : (isActive ? 'Desactivar acceso' : 'Activar acceso')}
                             aria-label={isActive ? `Desactivar acceso de ${user.email}` : `Activar acceso de ${user.email}`}
-                            className={`p-2 rounded-lg transition-all disabled:opacity-40
+                            className={`p-2 rounded-lg transition disabled:opacity-40
                               ${isActive ? 'text-brand-slate hover:text-rose-600 hover:bg-rose-50' : 'text-brand-slate hover:text-emerald-600 hover:bg-emerald-50'}`}>
                             {isActive ? <UserX size={15} /> : <UserCheck size={15} />}
                           </button>
@@ -325,7 +313,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
           )}
         </div>
         <p className="text-xs text-brand-gray text-center mt-4">
-          Los usuarios inactivos no pueden acceder al sistema aunque tengan credenciales válidas en Firebase.
+          Un usuario inactivo no puede entrar aunque su clave sea válida.
         </p>
       </div>
 

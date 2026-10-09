@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Button } from '../ui';
+import { fieldClassSm as fieldClass } from '../ui/fieldClasses';
 import { gatherPeriodEntries } from '../../utils/report';
 import { exportPeriodReport } from '../../utils/excel';
 import { Loader2, FileSpreadsheet } from 'lucide-react';
@@ -19,7 +20,6 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
   const [error, setError]     = useState('');
   const [result, setResult]   = useState(null); // cantidad de movimientos del último reporte generado
 
-  const fieldClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all text-sm';
 
   const handleGenerate = async () => {
     setError('');
@@ -61,7 +61,7 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
           <div className="grid grid-cols-2 gap-2">
             {[{ value: 'xlsx', label: 'Excel (.xlsx)' }, { value: 'csv', label: 'CSV (.csv)' }].map(opt => (
               <button key={opt.value} type="button" onClick={() => setFormat(opt.value)}
-                className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition ${
                   format === opt.value
                     ? 'bg-brand-orange/10 border-brand-orange text-brand-orange'
                     : 'bg-brand-bg border-brand-border text-brand-slate hover:border-brand-orange/40'
@@ -73,7 +73,7 @@ const ReportModal = ({ isOpen, onClose, db, items }) => {
         </div>
 
         {error && (
-          <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3">{error}</p>
+          <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">{error}</p>
         )}
         {result !== null && !error && (
           <p className="text-emerald-700 text-xs text-center bg-emerald-50 border border-emerald-200 rounded-lg py-2 px-3">

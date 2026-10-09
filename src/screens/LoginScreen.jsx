@@ -24,12 +24,11 @@ const LoginScreen = ({ onLogin, accessError }) => {
     }
   };
 
-  const inputClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange/40 transition-all text-sm';
+  const inputClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange/40 transition text-sm';
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-orange/8 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-brand-slate/8 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute inset-0 bg-glow-login pointer-events-none" />
 
       <div className="w-full max-w-sm animate-modal-in relative z-10">
         <div className="text-center mb-8">
@@ -43,7 +42,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
 
         {/* Error de acceso denegado (viene de App.jsx) */}
         {accessError && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3">
+          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 animate-reveal">
             <ShieldX size={18} className="text-rose-500 flex-shrink-0 mt-0.5" />
             <p className="text-rose-700 text-sm">{accessError}</p>
           </div>
@@ -64,13 +63,13 @@ const LoginScreen = ({ onLogin, accessError }) => {
             </div>
 
             {error && (
-              <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3">
+              <p key={error} className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">
                 {error}
               </p>
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-brand-amber disabled:bg-brand-gray text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-brand-orange/30 mt-2">
+              className="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-brand-amber disabled:bg-brand-gray text-white font-semibold py-3 rounded-xl transition shadow-lg hover:shadow-brand-orange/30 mt-2">
               <LogIn size={16} />
               {loading ? 'Verificando…' : 'Ingresar'}
             </button>
@@ -78,7 +77,7 @@ const LoginScreen = ({ onLogin, accessError }) => {
         </div>
 
         <p className="text-center text-xs text-brand-gray mt-10">
-          Betrmedia SAS · 2026 ©️
+          © 2026 Betrmedia SAS
         </p>
       </div>
     </div>

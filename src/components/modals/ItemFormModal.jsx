@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { ChevronDown } from 'lucide-react';
-import { Modal, Button } from '../ui';
+import { Modal, Button, Spinner } from '../ui';
+import { fieldClass } from '../ui/fieldClasses';
 import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_MANTENIMIENTO, FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT, CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
 import { findDuplicateConflicts } from '../../utils/duplicates';
 import { DuplicateWarningModal } from './OtherModals';
@@ -24,7 +25,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
   const [error, setError] = useState('');
   const [conflicts, setConflicts] = useState([]);
   const [specsOpen, setSpecsOpen] = useState(false);
-  const f = 'bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all w-full';
+  const f = fieldClass;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -114,9 +115,8 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
                 <input type="checkbox" name="sinMantenimiento" checked={item.sinMantenimiento === true}
                   onChange={handleChange}
                   className="mt-0.5 w-4 h-4 rounded border-brand-border text-brand-orange focus:ring-2 focus:ring-brand-orange/50 flex-shrink-0" />
-                <span className="text-xs text-brand-slate leading-tight">
+                <span className="text-xs text-brand-slate leading-tight" title="Ej. equipos en backup sin uso.">
                   No requiere mantenimiento preventivo
-                  <span className="block text-brand-gray">Ej. equipos en backup sin uso.</span>
                 </span>
               </label>
             </div>
@@ -132,7 +132,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
                 <ChevronDown size={15} className={`text-brand-gray transition-transform duration-200 ${specsOpen ? 'rotate-180' : ''}`} />
               </button>
               {specsOpen && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-3.5 pb-3.5 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-3.5 pb-3.5 pt-1 animate-reveal">
                   {CAMPOS_ESPECIFICACIONES.map(({ key, label }) => (
                     <input key={key} name={key} value={item[key] ?? ''} onChange={handleChange}
                       placeholder={label} className={f} />
@@ -152,7 +152,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
         </div>
 
         {estadoChanged && (
-          <div className="bg-brand-orange/8 border border-brand-orange/20 rounded-xl p-3">
+          <div className="bg-brand-orange/8 border border-brand-orange/20 rounded-xl p-3 animate-reveal">
             <label className="text-xs font-semibold text-brand-ink mb-1.5 block">
               Motivo del cambio de estado (opcional)
             </label>
@@ -167,11 +167,11 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
 
         <div className="flex justify-end gap-3 pt-2">
           {error && (
-            <p className="text-rose-600 text-xs flex-1 flex items-center">{error}</p>
+            <p className="text-rose-600 text-xs flex-1 flex items-center animate-reveal">{error}</p>
           )}
           <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button variant="primary" type="submit" disabled={saving} className="flex items-center gap-2">
-            {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {saving && <Spinner size="sm" tone="light" />}
             {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         </div>

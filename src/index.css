@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,14 +13,111 @@ body {
 }
 
 @layer utilities {
+  /* Entradas: desde 0.96, nunca desde 0. `backwards` evita dejar un transform residual al terminar */
   .animate-modal-in {
-    animation: fadeInScale 0.25s ease-out forwards;
+    animation: fadeInScale 0.2s cubic-bezier(0.23, 1, 0.32, 1) backwards;
   }
+  /* Menús desplegables: nacen y mueren en el punto del disparador */
+  .animate-pop-in {
+    transform-origin: top right;
+    animation: fadeInScale 0.15s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  }
+  .animate-pop-in-left {
+    transform-origin: top left;
+    animation: fadeInScale 0.15s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  }
+  .animate-pop-out {
+    transform-origin: top right;
+    animation: fadeOutScale 0.1s ease-out forwards;
+    pointer-events: none;
+  }
+  .animate-pop-out-left {
+    transform-origin: top left;
+    animation: fadeOutScale 0.1s ease-out forwards;
+    pointer-events: none;
+  }
+  /* Contenido que se despliega dentro de la página (filtros, secciones) */
+  .animate-reveal {
+    animation: reveal 0.18s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  }
+  /* Solo opacidad: para elementos que aparecen mientras se escribe */
+  .animate-fade-in {
+    animation: overlayIn 0.1s ease-out backwards;
+  }
+  /* Entrada escalonada de un grupo (40 ms entre hijos). Solo al montar; no bloquea clics */
+  .stagger-in > * {
+    animation: reveal 0.18s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  }
+  .stagger-in > :nth-child(2) { animation-delay: 40ms; }
+  .stagger-in > :nth-child(3) { animation-delay: 80ms; }
+  .stagger-in > :nth-child(4) { animation-delay: 120ms; }
+  .stagger-in > :nth-child(5) { animation-delay: 160ms; }
+  .stagger-in > :nth-child(6) { animation-delay: 200ms; }
+}
+
+/* Modal: el fondo solo hace fundido; únicamente el panel escala.
+   Salida más corta que la entrada. */
+.modal-overlay {
+  animation: overlayIn 0.2s ease-out backwards;
+}
+.modal-overlay[data-state="closed"] {
+  animation: overlayOut 0.15s ease-out forwards;
+  pointer-events: none;
+}
+.modal-panel {
+  animation: fadeInScale 0.2s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+.modal-overlay[data-state="closed"] .modal-panel {
+  animation: fadeOutScale 0.15s ease-out forwards;
 }
 
 @keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
+}
+@keyframes fadeOutScale {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+@keyframes overlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Foco visible con el color de marca (solo teclado) */
+button:focus-visible, a:focus-visible, [tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid #E68E00;
+  outline-offset: 2px;
+}
+
+/* Feedback al presionar: botones compactos se hunden un poco.
+   Los de ancho completo (filas de lista) no, se verían raros; los que ya usan translate tampoco (perderían su posición). */
+button:not(:disabled):not(.w-full):not([class*="translate"]):active {
+  transform: scale(0.97);
+}
+
+h1, h2, h3 { text-wrap: balance; }
+
+/* Resplandor de fondo: degradado estático en vez de un blur de 120px (mismo aspecto, sin costo de pintura) */
+.bg-glow {
+  background: radial-gradient(600px 400px at 100% 0%, rgba(230, 142, 0, 0.07), transparent 70%);
+}
+.bg-glow-login {
+  background:
+    radial-gradient(500px 500px at 100% 0%, rgba(230, 142, 0, 0.1), transparent 70%),
+    radial-gradient(400px 400px at 0% 100%, rgba(94, 106, 116, 0.1), transparent 70%);
+}
+
+/* Respeta a quien pidió menos movimiento: se quedan los fundidos, se va el desplazamiento y escala */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  button:not(:disabled):not(.w-full):not([class*="translate"]):active { transform: none; }
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }

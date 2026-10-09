@@ -3,27 +3,75 @@
 //  Átomos con paleta de marca Betrmedia
 // ─────────────────────────────────────────────
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { X, ChevronDown, Sparkles } from 'lucide-react';
-import { ESTADO_STYLES } from '../../config/constants';
+import { ESTADO_STYLES, STATUS_DOT } from '../../config/constants';
+import { usePresence, useEscape, usePopover, useScrollLock } from '../../hooks/usePopover';
+
+// ── Spinner de carga ─────────────────────────
+export const Spinner = ({ size = 'md', tone = 'brand' }) => {
+  const sizes = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' };
+  const tones = { brand: 'border-brand-orange/30 border-t-brand-orange', light: 'border-white/30 border-t-white' };
+  return <span role="status" aria-label="Cargando" className={`inline-block border-2 rounded-full animate-spin ${sizes[size]} ${tones[tone]}`} />;
+};
 
 // ── Modal base ───────────────────────────────
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
-  if (!isOpen) return null;
+  const mounted = usePresence(isOpen, 150);
+  const panelRef = useRef(null);
+  useEscape(isOpen, onClose);
+  useScrollLock(isOpen);
+
+  // Al abrir: foco dentro del panel. Al cerrar: vuelve a quien lo abrió.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const previous = document.activeElement;
+    panelRef.current?.focus();
+    return () => { if (previous instanceof HTMLElement) previous.focus(); };
+  }, [isOpen]);
+
+  // Tab no se escapa del modal hacia la página de fondo
+  const trapTab = (e) => {
+    if (e.key !== 'Tab') return;
+    const nodes = [...panelRef.current.querySelectorAll(FOCUSABLE)];
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  };
+
+  if (!mounted) return null;
   const sizes = { sm: 'max-w-md', md: 'max-w-2xl', lg: 'max-w-4xl' };
   return (
-    <div className="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm flex justify-center items-center z-50 animate-modal-in p-4 sm:p-8">
-      <div className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizes[size]} max-h-[85vh] overflow-y-auto relative`}>
+    <div data-state={isOpen ? 'open' : 'closed'}
+      className="modal-overlay fixed inset-0 bg-brand-ink/50 backdrop-blur-sm flex justify-center items-center z-50 p-4 sm:p-8">
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={trapTab}
+        className={`modal-panel bg-white rounded-2xl shadow-2xl p-5 sm:p-8 w-full ${sizes[size]} max-h-[85vh] overflow-y-auto relative outline-none`}>
         <button onClick={onClose} aria-label="Cerrar"
           className="absolute top-4 right-4 text-brand-gray hover:text-brand-ink transition-colors p-1 rounded-lg hover:bg-brand-bg">
           <X size={20} />
         </button>
-        <h2 className="text-xl font-bold mb-6 text-brand-ink">{title}</h2>
+        <h2 className="text-xl font-bold mb-6 pr-8 text-brand-ink">{title}</h2>
         {children}
       </div>
     </div>
   );
 };
+
+// ── Estado vacío ─────────────────────────────
+export const EmptyState = ({ icon, title, action }) => (
+  <div className="flex flex-col items-center gap-3 py-16 px-4 text-center">
+    {icon && <span className="text-brand-gray/50">{icon}</span>}
+    <p className="text-sm text-brand-gray">{title}</p>
+    {action}
+  </div>
+);
 
 // ── Badge de estado ──────────────────────────
 export const StatusBadge = ({ status }) => (
@@ -31,6 +79,36 @@ export const StatusBadge = ({ status }) => (
     {status}
   </span>
 );
+
+// ── Estado como punto + texto (listas largas: pesa menos que la insignia) ──
+export const StatusDot = ({ status, withLabel = true }) => (
+  <span className="inline-flex items-center gap-1.5 whitespace-nowrap" title={withLabel ? undefined : status}>
+    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[status] ?? 'bg-gray-300'}`} />
+    {withLabel && <span className="text-xs text-brand-slate">{status}</span>}
+  </span>
+);
+
+// ── Barra segmentada con la proporción de cada estado ──
+export const StatusBar = ({ counts, className = '' }) => (
+  <div className={`flex h-1.5 rounded-full overflow-hidden bg-brand-bg gap-px ${className}`}
+    title={counts.map(([s, n]) => `${s}: ${n}`).join(' · ')}>
+    {counts.map(([s, n]) => <span key={s} className={STATUS_DOT[s]} style={{ flexGrow: n }} />)}
+  </div>
+);
+
+// ── Persona encargada: iniciales + nombre ──
+export const Initials = ({ name }) => {
+  if (!name) {
+    return <span className="italic text-xs text-brand-gray">Sin asignar</span>;
+  }
+  const ini = name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  return (
+    <span className="flex items-center gap-2 min-w-0 max-w-full" title={name}>
+      <span className="w-6 h-6 rounded-full bg-brand-ink/5 text-brand-ink text-xs font-semibold flex items-center justify-center flex-shrink-0">{ini}</span>
+      <span className="text-sm text-brand-slate truncate">{name}</span>
+    </span>
+  );
+};
 
 // ── Badge "Nuevo" — equipo nunca antes asignado ──
 export const NewBadge = () => (
@@ -41,14 +119,14 @@ export const NewBadge = () => (
 
 // ── Tarjeta de estadística ───────────────────
 export const StatCard = ({ title, value, icon, accent, onClick }) => (
-  <button onClick={onClick}
-    className="group w-full text-left bg-white border border-brand-border p-3 sm:p-5 rounded-2xl flex items-center gap-3 sm:gap-4 transition-all duration-200 hover:border-brand-orange/40 hover:shadow-md hover:shadow-brand-orange/10 focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
-    <div className={`p-3 rounded-xl ${accent} flex-shrink-0 transition-transform duration-200 group-hover:scale-110`}>
+  <button onClick={onClick} title={title}
+    className="group w-full text-left bg-white border border-brand-border p-3 sm:p-5 rounded-2xl flex items-center gap-3 sm:gap-4 transition hover:border-brand-orange/40 hover:shadow-md hover:shadow-brand-orange/10 focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
+    <div className={`p-3 rounded-xl ${accent} flex-shrink-0 transition-transform duration-200 group-hover:scale-105`}>
       {icon}
     </div>
     <div className="min-w-0">
       <p className="text-brand-gray text-xs font-medium truncate">{title}</p>
-      <p className="text-brand-ink text-xl sm:text-2xl font-bold leading-none mt-0.5">{value}</p>
+      <p className="text-brand-ink text-xl sm:text-2xl font-bold leading-none mt-0.5 tabular-nums">{value}</p>
     </div>
   </button>
 );
@@ -56,7 +134,7 @@ export const StatCard = ({ title, value, icon, accent, onClick }) => (
 // ── Input estilizado ─────────────────────────
 export const Input = ({ className = '', ...props }) => (
   <input
-    className={`w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange/40 transition-all ${className}`}
+    className={`w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:border-brand-orange/40 transition ${className}`}
     {...props}
   />
 );
@@ -64,7 +142,7 @@ export const Input = ({ className = '', ...props }) => (
 // ── Select estilizado ────────────────────────
 export const Select = ({ children, className = '', ...props }) => (
   <select
-    className={`bg-brand-bg border border-brand-border text-brand-ink p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all ${className}`}
+    className={`bg-brand-bg border border-brand-border text-brand-ink p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition ${className}`}
     {...props}
   >
     {children}
@@ -74,22 +152,24 @@ export const Select = ({ children, className = '', ...props }) => (
 // ── Textarea estilizado ──────────────────────
 export const Textarea = ({ className = '', ...props }) => (
   <textarea
-    className={`w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all resize-none ${className}`}
+    className={`w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition resize-none ${className}`}
     {...props}
   />
 );
 
 // ── Botones ──────────────────────────────────
-export const Button = ({ variant = 'primary', className = '', children, ...props }) => {
+export const Button = ({ variant = 'primary', size = 'md', className = '', children, ...props }) => {
   const variants = {
     primary:   'bg-brand-orange hover:bg-brand-amber text-white font-semibold shadow-md hover:shadow-brand-orange/30',
     secondary: 'bg-brand-bg hover:bg-brand-border text-brand-slate border border-brand-border',
     danger:    'bg-rose-500 hover:bg-rose-600 text-white font-semibold',
+    dangerGhost: 'text-rose-600 hover:bg-rose-50 font-medium',
     warning:   'bg-brand-amber hover:bg-brand-orange text-white font-semibold',
     ghost:     'text-brand-slate hover:text-brand-ink hover:bg-brand-bg',
   };
+  const sizes = { md: 'px-5 py-2.5', sm: 'px-3 py-2 text-xs' };
   return (
-    <button className={`px-5 py-2.5 rounded-xl transition-all duration-200 ${variants[variant]} ${className}`} {...props}>
+    <button className={`${sizes[size]} rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none ${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );
@@ -97,28 +177,21 @@ export const Button = ({ variant = 'primary', className = '', children, ...props
 
 // ── Dropdown custom ──────────────────────────
 export const Dropdown = ({ value, onChange, options }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const { open, setOpen, ref, shown } = usePopover();
 
   const selected = options.find(o => (o.value ?? o) === value);
   const label = selected?.label ?? selected ?? value;
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(p => !p)}
-        className="flex items-center justify-between gap-3 min-w-[160px] bg-brand-bg border border-brand-border hover:border-brand-orange/50 text-brand-ink text-sm px-4 py-2.5 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
+      <button type="button" onClick={() => setOpen(p => !p)} aria-expanded={open}
+        className="flex items-center justify-between gap-3 min-w-[160px] bg-brand-bg border border-brand-border hover:border-brand-orange/50 text-brand-ink text-sm px-4 py-2.5 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
         <span>{label}</span>
         <ChevronDown size={14} className={`text-brand-gray transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-2 w-full min-w-[180px] bg-white border border-brand-border rounded-xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in">
+      {shown && (
+        <div className={`absolute z-50 mt-2 w-full min-w-[180px] bg-white border border-brand-border rounded-xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in-left' : 'animate-pop-out-left'}`}>
           {options.map(opt => {
             const val = opt.value ?? opt;
             const lbl = opt.label ?? opt;

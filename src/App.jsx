@@ -14,6 +14,7 @@ import LoginScreen        from './screens/LoginScreen';
 import InventoryDashboard from './screens/InventoryDashboard';
 import UsersScreen        from './screens/UsersScreen';
 import MaintenanceScreen  from './screens/MaintenanceScreen';
+import { Spinner } from './components/ui';
 import ConfigErrorScreen  from './screens/ConfigErrorScreen';
 
 export default function App() {
@@ -106,7 +107,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-bg flex justify-center items-center">
-        <div className="w-8 h-8 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
+        <Spinner size="lg" />
       </div>
     );
   }

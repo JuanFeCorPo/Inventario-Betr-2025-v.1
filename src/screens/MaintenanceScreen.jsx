@@ -1,22 +1,29 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Wrench, CheckCircle2, Loader2 } from 'lucide-react';
-import { Modal, Button, StatusBadge } from '../components/ui';
+import { ArrowLeft, CheckCircle2, Loader2, Laptop, Cpu } from 'lucide-react';
+import { Modal, Button, EmptyState } from '../components/ui';
+import { formatFecha } from '../utils/format';
+import { fieldClass } from '../components/ui/fieldClasses';
 import useInventory from '../hooks/useInventory';
-import { groupMaintenanceByUrgency } from '../utils/maintenance';
+import { groupMaintenanceByUrgency, GRUPOS_URGENCIA } from '../utils/maintenance';
 
 const URGENCIA_STYLES = {
-  'vencido':     { label: 'Vencidos',    dot: 'bg-rose-500',    text: 'text-rose-600',    bg: 'bg-rose-50 border-rose-100' },
-  'esta-semana': { label: 'Esta semana', dot: 'bg-amber-500',   text: 'text-amber-600',   bg: 'bg-amber-50 border-amber-100' },
-  'este-mes':    { label: 'Este mes',    dot: 'bg-violet-500',  text: 'text-violet-600',  bg: 'bg-violet-50 border-violet-100' },
-  'proximo':     { label: 'Próximos',    dot: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
+  'vencido':     { dot: 'bg-rose-500',    text: 'text-rose-600' },
+  'esta-semana': { dot: 'bg-amber-500',   text: 'text-amber-600' },
+  'este-mes':    { dot: 'bg-violet-500',  text: 'text-violet-600' },
+  'proximo':     { dot: 'bg-emerald-500', text: 'text-emerald-600' },
 };
 
-const fieldClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all';
+// Texto corto para la línea compacta: "Hace 4 d", "Hoy", "12 d"
+const diasCorto = (dias) => {
+  if (dias < 0) return `Hace ${Math.abs(dias)} d`;
+  if (dias === 0) return 'Hoy';
+  return `${dias} d`;
+};
 
-const formatDiasRestantes = (dias) => {
-  if (dias < 0) return `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`;
-  if (dias === 0) return 'Vence hoy';
-  return `En ${dias} día${dias !== 1 ? 's' : ''}`;
+const diasLargo = (dias) => {
+  if (dias < 0) return `vencido hace ${Math.abs(dias)} día${Math.abs(dias) !== 1 ? 's' : ''}`;
+  if (dias === 0) return 'vence hoy';
+  return `vence en ${dias} día${dias !== 1 ? 's' : ''}`;
 };
 
 const RegisterMaintenanceModal = ({ isOpen, onClose, onConfirm, itemName }) => {
@@ -61,33 +68,50 @@ const RegisterMaintenanceModal = ({ isOpen, onClose, onConfirm, itemName }) => {
   );
 };
 
-const MaintenanceRow = ({ item, info, isAdmin, onRegister }) => {
-  const style = URGENCIA_STYLES[info.urgencia];
+// Una columna por nivel de urgencia: total en grande y una línea por equipo.
+// El administrador toca la línea para registrar el mantenimiento.
+const UrgencyColumn = ({ group, isAdmin, onRegister }) => {
+  const style = URGENCIA_STYLES[group.key];
+  const { rows } = group;
   return (
-    <li className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-semibold text-brand-ink text-sm">{item.nombre}</p>
-          <StatusBadge status={item.estado} />
+    <section className="bg-white border border-brand-border rounded-2xl shadow-sm overflow-hidden">
+      <header className="px-4 pt-3 pb-2.5 border-b border-brand-border">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+          <h2 className="text-xs font-semibold text-brand-slate uppercase tracking-wider">{group.label}</h2>
         </div>
-        <p className="text-xs text-brand-gray mt-0.5">
-          {item.categoria} · Nº {item.numeroInventario} {item.personaEncargada ? `· ${item.personaEncargada}` : ''}
-        </p>
-      </div>
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${style.bg} ${style.text}`}>
-          {formatDiasRestantes(info.diasRestantes)}
+        <div className="flex items-baseline justify-between gap-2 mt-1">
+          <p className={`text-3xl font-bold tabular-nums leading-none ${rows.length ? style.text : 'text-brand-gray/40'}`}>{rows.length}</p>
+          {rows[0] && <p className="text-xs text-brand-gray">próximo {formatFecha(rows[0].info.proximaFecha)}</p>}
         </div>
-        <span className="text-xs text-brand-gray whitespace-nowrap hidden sm:inline">
-          {info.proximaFecha.toLocaleDateString()}
-        </span>
-        {isAdmin && (
-          <Button variant="secondary" onClick={() => onRegister(item)} className="!px-3 !py-2 text-xs flex items-center gap-1.5 flex-shrink-0">
-            <Wrench size={13} /> <span className="hidden sm:inline">Registrar</span>
-          </Button>
-        )}
-      </div>
-    </li>
+      </header>
+      <ul className="py-1">
+        {rows.length === 0 && <li className="text-xs text-brand-gray text-center py-4">Nada aquí.</li>}
+        {rows.map(({ item, info }) => {
+          const Icon = item.categoria === 'CPU' ? Cpu : Laptop;
+          const tooltip = `${item.nombre} · Nº ${item.numeroInventario} · ${item.personaEncargada || 'Sin asignar'} — ${diasLargo(info.diasRestantes)} (${formatFecha(info.proximaFecha)})`;
+          const content = (
+            <>
+              <Icon size={13} className="text-brand-gray flex-shrink-0" />
+              <span className="text-[13px] text-brand-ink truncate flex-1">{item.nombre}</span>
+              <span className={`text-xs font-semibold tabular-nums whitespace-nowrap ${style.text}`}>{diasCorto(info.diasRestantes)}</span>
+            </>
+          );
+          return (
+            <li key={item.id}>
+              {isAdmin ? (
+                <button type="button" onClick={() => onRegister(item)} title={`${tooltip}. Toca para registrar.`}
+                  className="w-full flex items-center gap-2 px-4 py-1.5 text-left hover:bg-brand-bg/70 transition-colors">
+                  {content}
+                </button>
+              ) : (
+                <div title={tooltip} className="flex items-center gap-2 px-4 py-1.5">{content}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 };
 
@@ -96,7 +120,10 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
   const { items, loading, registerMaintenance } = useInventory(db, user);
   const [target, setTarget] = useState(null);
 
-  const groups = useMemo(() => groupMaintenanceByUrgency(items), [items]);
+  const groups = useMemo(() => {
+    const found = groupMaintenanceByUrgency(items);
+    return GRUPOS_URGENCIA.map(g => found.find(f => f.key === g.key) ?? { ...g, rows: [] });
+  }, [items]);
   const totalRelevantes = useMemo(() => groups.reduce((n, g) => n + g.rows.length, 0), [groups]);
 
   const handleConfirmRegister = async (fecha, notas) => {
@@ -106,13 +133,13 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
 
   return (
     <div className="min-h-screen bg-brand-bg font-sans">
-      <div className="fixed top-0 right-0 w-[600px] h-[400px] bg-brand-orange/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed inset-0 bg-glow pointer-events-none" />
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         <header className="flex items-center gap-4 mb-8">
-          <button onClick={onBack}
-            className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition-all shadow-sm text-brand-slate hover:text-brand-ink">
+          <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
+            className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition shadow-sm text-brand-slate hover:text-brand-ink">
             <ArrowLeft size={18} />
           </button>
           <div>
@@ -127,29 +154,14 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
             <span className="text-sm">Cargando equipos…</span>
           </div>
         ) : totalRelevantes === 0 ? (
-          <div className="text-center py-16 text-brand-gray bg-white border border-brand-border rounded-2xl">
-            <CheckCircle2 size={32} className="mx-auto mb-3 text-emerald-400" />
-            <p className="text-sm">No hay mantenimientos pendientes por ahora.</p>
+          <div className="bg-white border border-brand-border rounded-2xl">
+            <EmptyState icon={<CheckCircle2 size={32} className="text-emerald-400" />} title="No hay mantenimientos pendientes por ahora." />
           </div>
         ) : (
-          <div className="space-y-6">
-            {groups.map(group => {
-              const style = URGENCIA_STYLES[group.key];
-              return (
-                <div key={group.key}>
-                  <div className="flex items-center gap-2 mb-2 px-1">
-                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
-                    <h2 className="text-sm font-bold text-brand-ink">{group.label}</h2>
-                    <span className="text-xs text-brand-gray">({group.rows.length})</span>
-                  </div>
-                  <ul className="bg-white border border-brand-border rounded-2xl shadow-sm divide-y divide-brand-border overflow-hidden">
-                    {group.rows.map(({ item, info }) => (
-                      <MaintenanceRow key={item.id} item={item} info={info} isAdmin={isAdmin} onRegister={setTarget} />
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+            {groups.map(group => (
+              <UrgencyColumn key={group.key} group={group} isAdmin={isAdmin} onRegister={setTarget} />
+            ))}
           </div>
         )}
       </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Archive, AlertTriangle } from 'lucide-react';
 import { Modal, Button, StatusBadge } from '../ui';
+import { fieldClass } from '../ui/fieldClasses';
 import HistoryTimeline from '../HistoryTimeline';
 
-const fieldClass = 'w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition-all';
 
 export const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
   const [reason, setReason] = useState('');
@@ -22,7 +22,7 @@ export const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
           placeholder="Ej: Pantalla rota, equipo obsoleto…" className={`${fieldClass} h-28 resize-none`} />
         <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={fieldClass} />
         {error && (
-          <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3">{error}</p>
+          <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">{error}</p>
         )}
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>

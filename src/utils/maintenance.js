@@ -26,6 +26,11 @@ export function aplicaMantenimiento(item) {
     && item?.estado !== 'Fuera de Servicio';
 }
 
+// Días de calendario entre dos fechas, sin importar la hora: un equipo que
+// vence hoy da 0 aunque ya haya pasado la hora de su fecha (antes daba -1).
+const inicioDelDia = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const diasEntre = (desde, hasta) => Math.round((inicioDelDia(hasta) - inicioDelDia(desde)) / MS_POR_DIA);
+
 function toDate(value) {
   return value?.toDate ? value.toDate() : null;
 }
@@ -42,7 +47,7 @@ export function getMaintenanceInfo(item, now = new Date()) {
   const proximaFecha = new Date(baseDate);
   proximaFecha.setMonth(proximaFecha.getMonth() + frecuenciaMeses);
 
-  const diasRestantes = Math.floor((proximaFecha.getTime() - now.getTime()) / MS_POR_DIA);
+  const diasRestantes = diasEntre(now, proximaFecha);
 
   let urgencia;
   if (diasRestantes < 0) urgencia = 'vencido';

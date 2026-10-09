@@ -82,13 +82,13 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
             Sube un archivo Excel (.xlsx) con tu inventario. Puedes usar el botón <span className="font-medium text-brand-ink">Exportar</span> primero
             para descargar una plantilla con las columnas y valores válidos de categoría/estado.
           </p>
-          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-brand-border rounded-xl py-10 cursor-pointer hover:border-brand-orange/50 hover:bg-brand-bg/50 transition-all">
+          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-brand-border rounded-xl py-10 cursor-pointer hover:border-brand-orange/50 hover:bg-brand-bg/50 transition">
             <Upload size={28} className="text-brand-gray" />
             <span className="text-sm text-brand-slate">Haz clic para seleccionar un archivo .xlsx</span>
             <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
           </label>
           {fileError && (
-            <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3">{fileError}</p>
+            <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">{fileError}</p>
           )}
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={handleClose}>Cancelar</Button>

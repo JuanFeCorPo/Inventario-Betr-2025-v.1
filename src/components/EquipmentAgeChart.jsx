@@ -39,9 +39,11 @@ const EquipmentAgeChart = ({ items }) => {
                 <div className="h-2 bg-brand-bg rounded-full overflow-hidden">
                   <div className="h-full rounded-full"
                     style={{
-                      width: mounted ? `${(b.count / max) * 100}%` : '0%',
+                      width: `${(b.count / max) * 100}%`,
                       backgroundColor: b.color,
-                      transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+                      transformOrigin: 'left',
+                      transform: mounted ? 'scaleX(1)' : 'scaleX(0)',
+                      transition: 'transform 0.5s cubic-bezier(0.23,1,0.32,1)',
                     }}
                   />
                 </div>

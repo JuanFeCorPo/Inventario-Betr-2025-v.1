@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Modal, Button, StatusBadge, NewBadge } from '../ui';
 import HistoryTimeline from '../HistoryTimeline';
 import { exportItemHistory } from '../../utils/excel';
 import useEquipoHistorial from '../../hooks/useEquipoHistorial';
 import { getMaintenanceInfo } from '../../utils/maintenance';
+import { formatFecha } from '../../utils/format';
+import { fieldClassSm } from '../ui/fieldClasses';
 import { CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
 import { Edit, Archive, Trash2, StickyNote, Download, Loader2 } from 'lucide-react';
 
@@ -14,10 +16,15 @@ const Field = ({ label, value }) => (
   </div>
 );
 
-const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote }) => {
+const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote }) => {
   const [noteOpen,   setNoteOpen]   = useState(false);
   const [note,       setNote]       = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  // Al cerrar, el padre limpia el equipo: se conserva el último para que la salida animada tenga contenido.
+  const lastItem = useRef(itemProp);
+  if (itemProp) lastItem.current = itemProp;
+  const item = itemProp ?? lastItem.current;
 
   const historial = useEquipoHistorial(db, item?.id);
 
@@ -32,7 +39,7 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
     return [...synthetic, ...(item.history ?? []), ...historial];
   }, [item, historial]);
 
-  if (!isOpen || !item) return null;
+  if (!item) return null;
 
   const maintenanceInfo = getMaintenanceInfo(item);
 
@@ -67,14 +74,14 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
           <Field label="N° Inventario" value={item.numeroInventario} />
           <Field label="N° Serial" value={item.numeroSerial} />
           <Field label="Persona Encargada" value={item.personaEncargada} />
-          <Field label="Fecha de Ingreso" value={item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toLocaleDateString() : '—'} />
+          <Field label="Fecha de Ingreso" value={item.fechaIngreso?.toDate ? formatFecha(item.fechaIngreso.toDate()) : '—'} />
           {item.estado === 'De Baja' && (
-            <Field label="Fecha de Baja" value={item.fecha_baja?.toDate ? item.fecha_baja.toDate().toLocaleDateString() : '—'} />
+            <Field label="Fecha de Baja" value={item.fecha_baja?.toDate ? formatFecha(item.fecha_baja.toDate()) : '—'} />
           )}
           {item.motivo_baja && <Field label="Motivo de Baja" value={item.motivo_baja} />}
           {maintenanceInfo && (
             <Field label="Próximo Mantenimiento"
-              value={`${maintenanceInfo.proximaFecha.toLocaleDateString()} ${maintenanceInfo.urgencia === 'vencido' ? '(vencido)' : ''}`} />
+              value={`${formatFecha(maintenanceInfo.proximaFecha)} ${maintenanceInfo.urgencia === 'vencido' ? '(vencido)' : ''}`} />
           )}
           {item.sinMantenimiento === true && (
             <Field label="Mantenimiento" value="Excluido (sin uso)" />
@@ -120,11 +127,11 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
           </div>
 
           {noteOpen && (
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-3 animate-reveal">
               <input value={note} onChange={e => setNote(e.target.value)} placeholder="Escribe una nota…"
                 onKeyDown={e => e.key === 'Enter' && handleAddNote()}
-                className="flex-1 bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/50" />
-              <Button variant="primary" className="px-3 py-2 text-xs flex items-center gap-1.5" disabled={savingNote || !note.trim()} onClick={handleAddNote}>
+                className={`${fieldClassSm} flex-1 !py-2`} />
+              <Button variant="primary" size="sm" className="flex items-center gap-1.5" disabled={savingNote || !note.trim()} onClick={handleAddNote}>
                 {savingNote && <Loader2 size={13} className="animate-spin" />} Guardar
               </Button>
             </div>
@@ -137,15 +144,15 @@ const PreviewModal = ({ isOpen, onClose, item, isAdmin, db, onEdit, onDeactivate
 
         {/* Acciones */}
         {isAdmin && (
-          <div className="flex justify-end gap-2 pt-2 border-t border-brand-border flex-wrap">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-brand-border flex-wrap">
+            <Button variant="dangerGhost" onClick={onDelete} className="flex items-center gap-1.5 mr-auto">
+              <Trash2 size={14} /> Eliminar
+            </Button>
             {item.estado !== 'De Baja' && (
               <Button variant="secondary" onClick={onDeactivate} className="flex items-center gap-1.5">
                 <Archive size={14} /> Dar de Baja
               </Button>
             )}
-            <Button variant="danger" onClick={onDelete} className="flex items-center gap-1.5">
-              <Trash2 size={14} /> Eliminar
-            </Button>
             <Button variant="primary" onClick={onEdit} className="flex items-center gap-1.5">
               <Edit size={14} /> Editar
             </Button>

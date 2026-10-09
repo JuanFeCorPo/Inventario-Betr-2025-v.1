@@ -22,7 +22,7 @@ class ErrorBoundary extends Component {
           Ocurrió un error inesperado en la aplicación. Intenta recargar la página; si el problema persiste, contacta al administrador.
         </p>
         <button onClick={() => window.location.reload()}
-          className="bg-brand-orange hover:bg-brand-amber text-white font-semibold px-6 py-3 rounded-xl transition-all">
+          className="bg-brand-orange hover:bg-brand-amber text-white font-semibold px-6 py-3 rounded-xl transition">
           Recargar página
         </button>
       </div>

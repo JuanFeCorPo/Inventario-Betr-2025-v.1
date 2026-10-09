@@ -10,6 +10,7 @@ import {
   onSnapshot, query, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { EQUIPOS_PATH, EQUIPOS_ELIMINADOS_PATH } from '../config/firebase';
+import { formatFecha } from '../utils/format';
 
 const HISTORIAL = 'historial';
 
@@ -62,7 +63,7 @@ const useInventory = (db, user) => {
         const newVal = data[key];
         if (newVal instanceof Timestamp && oldVal instanceof Timestamp) {
           if (!newVal.isEqual(oldVal))
-            changes.push({ field: key, from: oldVal.toDate().toLocaleDateString(), to: newVal.toDate().toLocaleDateString() });
+            changes.push({ field: key, from: formatFecha(oldVal.toDate()), to: formatFecha(newVal.toDate()) });
         } else if (newVal !== oldVal) {
           changes.push({ field: key, from: oldVal ?? '', to: newVal ?? '' });
         }

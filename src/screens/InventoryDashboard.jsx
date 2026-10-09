@@ -1,11 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { StatCard, StatusBadge, NewBadge, Dropdown } from '../components/ui';
+import { useState, useMemo } from 'react';
+import { StatCard, StatusDot, Initials, NewBadge, Dropdown, Spinner, EmptyState, Button } from '../components/ui';
+import { usePopover } from '../hooks/usePopover';
 import {
   CheckCircle, PlusCircle, AlertTriangle,
-  Box, Users, Archive, LogOut, ChevronRight, ChevronDown, X, Wrench, Search,
+  Box, Users, UserCheck, Archive, LogOut, ChevronRight, ChevronDown, X, Wrench, Search,
   Menu, Download, Upload, MoreVertical, FileSpreadsheet,
-  Mouse, Monitor, Laptop, Cpu, Camera, Lightbulb, Headphones, Refrigerator,
-  Smartphone, Plug, BatteryCharging, PanelTop, Zap, Server, Package,
+  Package, ArrowLeft,
   ArrowUp, ArrowDown, ChevronsUpDown,
   Coffee, Cable, HardDrive, Mic, MemoryStick, Keyboard,
 } from 'lucide-react';
@@ -25,25 +25,9 @@ import { countOverdueMaintenance } from '../utils/maintenance';
 import AlertsBell     from '../components/AlertsBell';
 import EquipmentAgeChart from '../components/EquipmentAgeChart';
 import UpcomingMaintenanceCard from '../components/UpcomingMaintenanceCard';
+import CategoryMosaic from '../components/CategoryMosaic';
+import { CATEGORY_ICONS } from '../config/categoryIcons';
 
-// ── Ícono por categoría (ayuda a escanear la lista de un vistazo) ──
-const CATEGORY_ICONS = {
-  'Periféricos':       Mouse,
-  'Monitores':         Monitor,
-  'Laptops':           Laptop,
-  'CPU':               Cpu,
-  'Cámaras':           Camera,
-  'Luces':             Lightbulb,
-  'Audio':             Headphones,
-  'Electrodomésticos': Refrigerator,
-  'Smartphones':       Smartphone,
-  'Adaptadores':       Plug,
-  'UPS':               BatteryCharging,
-  'Bases y Soportes':  PanelTop,
-  'Estabilizadores':   Zap,
-  'Servidores y Red':  Server,
-  'Otros':             Package,
-};
 // La categoría es muy genérica ("Otros", "Electrodomésticos") para elegir un
 // ícono representativo — antes de caer en el de categoría, se intenta
 // reconocer el equipo puntual por palabras clave en su nombre.
@@ -73,10 +57,14 @@ const TABLE_COLUMNS = [
   { key: 'personaEncargada', label: 'Encargado', responsive: 'hidden lg:table-cell' },
 ];
 
+const STATUS_FILTERS = ['Activos', 'Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio', 'De Baja', 'Todos'];
+
 // ── Fila de tabla (desktop) ──────────────────
 const EquipoRow = ({ item, onAction }) => (
-  <tr className="border-b border-brand-border hover:bg-brand-bg/60 transition-colors cursor-pointer"
-    onClick={() => onAction('preview', item)}>
+  <tr className="border-b border-brand-border hover:bg-brand-bg/60 active:bg-brand-bg transition-colors cursor-pointer"
+    tabIndex={0}
+    onClick={() => onAction('preview', item)}
+    onKeyDown={(e) => { if (e.key === 'Enter') onAction('preview', item); }}>
     <td className="px-4 py-3.5 font-semibold text-brand-ink text-sm min-w-[160px]">
       <div className="flex items-center gap-2">
         <CategoryIcon categoria={item.categoria} nombre={item.nombre} size={15} className="text-brand-gray flex-shrink-0" />
@@ -85,16 +73,14 @@ const EquipoRow = ({ item, onAction }) => (
     </td>
     <td className="px-4 py-3.5 text-center">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
-        <StatusBadge status={item.estado} />
+        <StatusDot status={item.estado} />
         {item.condicion === 'Nuevo' && <NewBadge />}
       </div>
     </td>
     <td className="px-4 py-3.5 text-brand-slate text-sm font-mono whitespace-nowrap">{item.numeroInventario}</td>
     <td className="px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">{item.categoria}</td>
-    <td className="hidden lg:table-cell px-4 py-3.5 text-brand-slate text-sm whitespace-nowrap">
-      {item.personaEncargada || (
-        <span className="italic text-xs text-brand-gray/80 bg-brand-bg border border-brand-border px-2 py-0.5 rounded-full">Sin asignar</span>
-      )}
+    <td className="hidden lg:table-cell px-4 py-3.5 max-w-[220px]">
+      <Initials name={item.personaEncargada} />
     </td>
   </tr>
 );
@@ -105,7 +91,7 @@ const EquipoCard = ({ item, onAction }) => (
     className="w-full flex items-center justify-between px-4 py-3.5 text-left bg-white border border-brand-border rounded-xl shadow-sm hover:bg-brand-bg/50 transition-colors">
     <div className="flex items-center gap-3 min-w-0">
       <div className="flex flex-col items-start gap-1 flex-shrink-0">
-        <StatusBadge status={item.estado} />
+        <StatusDot status={item.estado} />
         {item.condicion === 'Nuevo' && <NewBadge />}
       </div>
       <div className="min-w-0">
@@ -113,7 +99,7 @@ const EquipoCard = ({ item, onAction }) => (
           <CategoryIcon categoria={item.categoria} nombre={item.nombre} size={13} className="text-brand-gray flex-shrink-0" />
           <p className="font-semibold text-brand-ink text-sm truncate">{item.nombre}</p>
         </div>
-        <p className="inline-block text-[11px] font-mono font-semibold text-brand-slate bg-brand-bg px-1.5 py-0.5 rounded mt-1">
+        <p className="inline-block text-xs font-mono font-semibold text-brand-slate bg-brand-bg px-1.5 py-0.5 rounded mt-1">
           {item.numeroInventario}
         </p>
       </div>
@@ -124,14 +110,7 @@ const EquipoCard = ({ item, onAction }) => (
 
 // ── Menú de más opciones (móvil) ──────────────
 const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintenance }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const { open, setOpen, ref, shown } = usePopover();
 
   const item = (icon, label, onClick, colorClass) => (
     <button type="button" onClick={() => { setOpen(false); onClick(); }}
@@ -144,11 +123,11 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
   return (
     <div ref={ref} className="relative sm:hidden">
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Más opciones"
-        className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition-all shadow-sm hover:shadow-md">
+        className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition shadow-sm hover:shadow-md">
         <MoreVertical size={16} />
       </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-2 w-64 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in">
+      {shown && (
+        <div className={`absolute right-0 z-50 mt-2 w-64 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
           <div className="px-4 py-2.5 border-b border-brand-border bg-brand-bg/50">
             <p className="text-xs font-semibold text-brand-gray uppercase tracking-wider">Más opciones</p>
           </div>
@@ -168,14 +147,7 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
 // ── Menú "Más" (desktop) — agrupa las acciones menos frecuentes para que
 // el header no sea una fila de seis botones sueltos ──
 const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const { open, setOpen, ref, shown } = usePopover();
 
   const row = (icon, label, onClick, colorClass) => (
     <button type="button" onClick={() => { setOpen(false); onClick(); }}
@@ -188,12 +160,12 @@ const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
   return (
     <div ref={ref} className="relative hidden sm:block">
       <button type="button" onClick={() => setOpen(p => !p)} aria-expanded={open} aria-label="Más acciones"
-        className="flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm">
+        className="flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition shadow-sm">
         Más
         <ChevronDown size={14} className={`text-brand-gray transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
-        <div className="absolute right-0 z-50 mt-2 w-56 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden animate-modal-in p-2 space-y-0.5">
+      {shown && (
+        <div className={`absolute right-0 z-50 mt-2 w-56 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'} p-2 space-y-0.5`}>
           {isAdmin && row(<Users size={15} />, 'Usuarios', onUsers, 'bg-slate-100 text-slate-600')}
           {row(<Download size={15} />, 'Exportar', onExport, 'bg-blue-100 text-blue-600')}
           {isAdmin && row(<Upload size={15} />, 'Importar', onImport, 'bg-emerald-100 text-emerald-600')}
@@ -217,6 +189,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const [filterCategory, setFilterCategory] = useState('Todos');
   const [filterStatus,   setFilterStatus]   = useState('Activos');
   const [mobileFilters,  setMobileFilters]  = useState(false);
+  const [showAllList,    setShowAllList]    = useState(false);
   const [sortConfig,     setSortConfig]     = useState({ key: 'nombre', direction: 'asc' });
 
   const toggleSort = (key) => setSortConfig(prev =>
@@ -291,9 +264,20 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
     [items, filterCategory],
   );
 
+  // Mosaico cuando no hay categoría ni búsqueda; la lista completa es opt-in.
+  const showMosaic = !loading && filterCategory === 'Todos' && !searchTerm && !showAllList;
+  const backToMosaic = () => { setFilterCategory('Todos'); setShowAllList(false); };
+
+  const hasFilters = searchTerm !== '' || filterCategory !== 'Todos' || filterStatus !== 'Activos';
+  const clearFilters = () => { setSearchTerm(''); setFilterCategory('Todos'); setFilterStatus('Activos'); setShowAllList(false); };
+  const emptyResults = (
+    <EmptyState icon={<Search size={28} />} title="No hay equipos con estos filtros."
+      action={hasFilters && <Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>} />
+  );
+
   return (
     <div className="min-h-screen bg-brand-bg text-brand-ink font-sans">
-      <div className="fixed top-0 right-0 w-[600px] h-[400px] bg-brand-orange/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed inset-0 bg-glow pointer-events-none" />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
 
@@ -306,8 +290,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             />
             <div className="border-l border-brand-border pl-3 min-w-0">
               <h1 className="text-sm sm:text-base font-bold text-brand-ink leading-tight truncate">
-                <span className="sm:hidden">Inventario Betr Media</span>
-                <span className="hidden sm:inline">Sistema de Inventario Betr Media</span>
+                Inventario Betr Media
               </h1>
               <p className="text-xs text-brand-gray truncate hidden sm:block">
                 {user.email} · <span className="text-brand-orange font-medium">{user.role}</span>
@@ -320,10 +303,10 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
               onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             <button onClick={() => onNavigate('maintenance')} aria-label="Ver mantenimientos preventivos" title="Mantenimientos preventivos"
-              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm relative">
+              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition shadow-sm relative">
               <Wrench size={15} /> Mantenimientos
               {maintenanceOverdue > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-rose-500 text-white text-[10px] font-bold rounded-full">
                   {maintenanceOverdue}
                 </span>
               )}
@@ -331,12 +314,12 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <MoreMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')}
               onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             <button onClick={() => openModal('add')} aria-label="Añadir equipo"
-              className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-3 sm:px-4 py-2.5 rounded-xl transition-all shadow-md hover:shadow-brand-orange/30">
+              className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-3 sm:px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30">
               <PlusCircle size={15} />
               <span className="hidden sm:inline">Añadir Equipo</span>
             </button>
             <button onClick={onLogout} aria-label="Cerrar sesión"
-              className="p-2.5 bg-white hover:bg-rose-50 border border-brand-border hover:border-rose-200 text-brand-gray hover:text-rose-500 rounded-xl transition-all shadow-sm"
+              className="p-2.5 bg-white hover:bg-rose-50 border border-brand-border hover:border-rose-200 text-brand-gray hover:text-rose-500 rounded-xl transition shadow-sm"
               title="Cerrar sesión">
               <LogOut size={16} />
             </button>
@@ -344,12 +327,12 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </header>
 
         {/* ── Stat Cards ─────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5 stagger-in">
           <StatCard title="Activos"      value={stats.total}           icon={<Box size={16} className="text-brand-orange"/>}          accent="bg-brand-orange/10"  onClick={() => setFilterStatus('Activos')} />
           <StatCard title="Disponibles"  value={stats.disponibles}     icon={<CheckCircle size={16} className="text-emerald-600"/>} accent="bg-emerald-50"    onClick={() => setFilterStatus('Disponible')} />
-          <StatCard title="En Uso"       value={stats.enUso}           icon={<Users size={16} className="text-amber-600"/>}         accent="bg-amber-50"      onClick={() => setFilterStatus('En Uso')} />
-          <StatCard title="Mant."        value={stats.enMantenimiento} icon={<Wrench size={16} className="text-violet-600"/>}       accent="bg-violet-50"     onClick={() => setFilterStatus('En Mantenimiento')} />
-          <StatCard title="F. Servicio"  value={stats.fueraServicio}   icon={<AlertTriangle size={16} className="text-rose-500"/>}  accent="bg-rose-50"       onClick={() => setFilterStatus('Fuera de Servicio')} />
+          <StatCard title="En Uso"       value={stats.enUso}           icon={<UserCheck size={16} className="text-amber-600"/>}         accent="bg-amber-50"      onClick={() => setFilterStatus('En Uso')} />
+          <StatCard title="Mantenimiento"      value={stats.enMantenimiento} icon={<Wrench size={16} className="text-violet-600"/>}       accent="bg-violet-50"     onClick={() => setFilterStatus('En Mantenimiento')} />
+          <StatCard title="Fuera de servicio" value={stats.fueraServicio}   icon={<AlertTriangle size={16} className="text-rose-500"/>}  accent="bg-rose-50"       onClick={() => setFilterStatus('Fuera de Servicio')} />
           <StatCard title="De Baja"      value={stats.deBaja}          icon={<Archive size={16} className="text-brand-gray"/>}       accent="bg-brand-gray/10"  onClick={() => setFilterStatus('De Baja')} />
         </div>
 
@@ -372,9 +355,9 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" />
               <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar equipo…"
-                className="w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray text-sm pl-9 pr-8 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/40 transition-all" />
+                className="w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray text-sm pl-9 pr-8 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/40 transition" />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} aria-label="Limpiar búsqueda" className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-ink">
+                <button onClick={() => setSearchTerm('')} aria-label="Limpiar búsqueda" className="animate-fade-in absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-ink">
                   <X size={14} />
                 </button>
               )}
@@ -382,9 +365,9 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
             {/* Toggle filtros en móvil */}
             <button onClick={() => setMobileFilters(p => !p)} aria-label="Mostrar filtros"
-              className="sm:hidden flex items-center gap-1.5 bg-brand-bg border border-brand-border text-brand-slate text-sm px-3 py-2.5 rounded-xl transition-all flex-shrink-0">
+              className="sm:hidden flex items-center gap-1.5 bg-brand-bg border border-brand-border text-brand-slate text-sm px-3 py-2.5 rounded-xl transition flex-shrink-0">
               <Menu size={15} />
-              {(filterCategory !== 'Todos' || filterStatus !== 'Activos') && (
+              {filterCategory !== 'Todos' && (
                 <span className="w-1.5 h-1.5 bg-brand-orange rounded-full" />
               )}
             </button>
@@ -392,8 +375,6 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             {/* Dropdowns en desktop */}
             <div className="hidden sm:flex items-center gap-2">
               <Dropdown value={filterCategory} onChange={setFilterCategory} options={categorias} />
-              <Dropdown value={filterStatus} onChange={setFilterStatus}
-                options={['Activos','Disponible','En Uso','En Mantenimiento','Fuera de Servicio','De Baja','Todos']} />
               {filterCategory !== 'Todos' && (
                 <span className="text-xs text-brand-slate bg-brand-bg border border-brand-border px-3 py-2.5 rounded-xl whitespace-nowrap">
                   <span className="font-bold text-brand-orange">{categoryCount}</span>
@@ -403,12 +384,21 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
           </div>
 
+          {/* Chips de estado: siempre a la vista (desplazables en celular) */}
+          <div className="flex gap-1.5 overflow-x-auto mt-3 -mx-1 px-1 pb-0.5">
+            {STATUS_FILTERS.map(s => (
+              <button key={s} type="button" onClick={() => setFilterStatus(s)} aria-pressed={filterStatus === s}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors flex-shrink-0
+                  ${filterStatus === s ? 'bg-brand-ink text-white border-brand-ink' : 'bg-white text-brand-slate border-brand-border hover:bg-brand-bg'}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+
           {/* Filtros expandibles en móvil */}
           {mobileFilters && (
-            <div className="sm:hidden mt-3 pt-3 border-t border-brand-border flex flex-col gap-2">
+            <div className="sm:hidden mt-3 pt-3 border-t border-brand-border flex flex-col gap-2 animate-reveal">
               <Dropdown value={filterCategory} onChange={setFilterCategory} options={categorias} />
-              <Dropdown value={filterStatus} onChange={setFilterStatus}
-                options={['Activos','Disponible','En Uso','En Mantenimiento','Fuera de Servicio','De Baja','Todos']} />
               <p className="text-xs text-brand-gray text-right">
                 {filteredItems.length} equipo{filteredItems.length !== 1 ? 's' : ''}
               </p>
@@ -416,17 +406,36 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
           )}
         </div>
 
+        {/* ── Mosaico de categorías (primer nivel) ── */}
+        {showMosaic && (filteredItems.length === 0
+          ? <div className="bg-white border border-brand-border rounded-2xl">{emptyResults}</div>
+          : <CategoryMosaic items={filteredItems} onSelect={setFilterCategory} onShowAll={() => setShowAllList(true)} />)}
+
+        {/* ── Volver al mosaico ─────────────────── */}
+        {!showMosaic && !searchTerm && (
+          <div className="flex items-center gap-2 mb-3 px-1 animate-reveal">
+            <button type="button" onClick={backToMosaic}
+              className="flex items-center gap-1.5 text-sm text-brand-slate hover:text-brand-ink px-2 py-1.5 -ml-2 rounded-lg hover:bg-white transition-colors">
+              <ArrowLeft size={15} /> Categorías
+            </button>
+            <span className="text-brand-gray">/</span>
+            <span className="text-sm font-semibold text-brand-ink truncate">
+              {filterCategory === 'Todos' ? 'Todos los equipos' : filterCategory}
+            </span>
+            <span className="ml-auto text-xs text-brand-gray tabular-nums">{filteredItems.length} equipo{filteredItems.length !== 1 ? 's' : ''}</span>
+          </div>
+        )}
+
+        {!showMosaic && (<>
         {/* ── Vista móvil: tarjetas ───────────── */}
         <div className="sm:hidden space-y-2">
           {loading ? (
             <div className="flex flex-col items-center gap-3 py-16 text-brand-gray">
-              <div className="w-6 h-6 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
+              <Spinner />
               <span className="text-sm">Cargando equipos…</span>
             </div>
           ) : filteredItems.length === 0 ? (
-            <p className="text-center py-16 text-brand-gray text-sm italic">
-              No se encontraron equipos con los filtros actuales.
-            </p>
+            <div className="bg-white border border-brand-border rounded-xl">{emptyResults}</div>
           ) : filteredItems.map(item => (
             <EquipoCard key={item.id} item={item} onAction={openModal} />
           ))}
@@ -457,14 +466,12 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                 {loading ? (
                   <tr><td colSpan="5" className="text-center py-16 text-brand-gray">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="w-6 h-6 border-2 border-brand-orange/30 border-t-brand-orange rounded-full animate-spin" />
+                      <Spinner />
                       <span className="text-sm">Cargando equipos…</span>
                     </div>
                   </td></tr>
                 ) : filteredItems.length === 0 ? (
-                  <tr><td colSpan="5" className="text-center py-16 text-brand-gray text-sm italic">
-                    No se encontraron equipos con los filtros actuales.
-                  </td></tr>
+                  <tr><td colSpan="5">{emptyResults}</td></tr>
                 ) : filteredItems.map(item => (
                   <EquipoRow key={item.id} item={item} onAction={openModal} />
                 ))}
@@ -472,6 +479,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             </table>
           </div>
         </div>
+        </>)}
 
         </div>
         </div>
