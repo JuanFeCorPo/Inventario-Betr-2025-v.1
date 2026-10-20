@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import {
-  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, deleteField, setDoc,
   onSnapshot, query, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { EQUIPOS_PATH, EQUIPOS_ELIMINADOS_PATH } from '../config/firebase';
@@ -73,6 +73,14 @@ const useInventory = (db, user) => {
       if (motivoEstado?.trim() && changes.some(c => c.field === 'estado')) {
         action += `\nMotivo del cambio de estado: ${motivoEstado.trim()}`;
       }
+      // Fecha desde la que el equipo está en su estado actual (alimenta la alerta de estancados)
+      if (changes.some(c => c.field === 'estado')) data.estadoDesde = Timestamp.now();
+      // Reactivar un equipo dado de baja: la fecha y el motivo de la baja ya no aplican
+      if (oldData.estado === 'De Baja' && data.estado && data.estado !== 'De Baja') {
+        data.fecha_baja = deleteField();
+        data.motivo_baja = deleteField();
+        action = action.replace('Equipo modificado.', 'Equipo reactivado tras una baja.');
+      }
       await updateDoc(ref, data);
       if (changes.length > 0) {
         const entry = { timestamp: Timestamp.now(), user: user.email, action, changes };
@@ -84,6 +92,7 @@ const useInventory = (db, user) => {
         addedBy: user.uid,
         addedByEmail: user.email,
         createdAt: Timestamp.now(),
+        estadoDesde: Timestamp.now(),
       });
     }
   };
@@ -94,6 +103,7 @@ const useInventory = (db, user) => {
     const fechaTimestamp = Timestamp.fromDate(new Date(fecha));
     await updateDoc(ref, {
       estado: 'De Baja',
+      estadoDesde: Timestamp.now(),
       fecha_baja: fechaTimestamp,
       motivo_baja: reason,
     });
@@ -138,6 +148,7 @@ const useInventory = (db, user) => {
           addedBy: user.uid,
           addedByEmail: user.email,
           createdAt: Timestamp.now(),
+          estadoDesde: Timestamp.now(),
         });
         const historialRef = doc(collection(db, EQUIPOS_PATH, ref.id, HISTORIAL));
         batch.set(historialRef, { timestamp: Timestamp.now(), user: user.email, action: 'Equipo importado desde Excel.' });
@@ -147,27 +158,48 @@ const useInventory = (db, user) => {
   };
 
   // ── Eliminar (queda registro en equipos_eliminados) ──
+  // Devuelve una copia (datos + historial) para poder deshacer con restoreItem.
   const deleteItem = async (id) => {
     const ref  = doc(db, EQUIPOS_PATH, id);
     const snap = await getDoc(ref);
+    let backup = null;
     if (snap.exists()) {
-      await addDoc(collection(db, EQUIPOS_ELIMINADOS_PATH), {
-        ...snap.data(),
+      const data = snap.data();
+      const tombstone = await addDoc(collection(db, EQUIPOS_ELIMINADOS_PATH), {
+        ...data,
         originalId: id,
         deletedBy: user.email,
         deletedAt: Timestamp.now(),
       });
+      backup = { id, data, history: [], tombstoneId: tombstone.id };
     }
     const historialSnap = await getDocs(collection(db, EQUIPOS_PATH, id, HISTORIAL));
+    if (backup) backup.history = historialSnap.docs.map(d => d.data());
     if (!historialSnap.empty) {
       const cleanupBatch = writeBatch(db);
       historialSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
       await cleanupBatch.commit();
     }
     await deleteDoc(ref);
+    return backup;
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote, registerMaintenance };
+  // ── Deshacer eliminar: vuelve el equipo con su mismo id e historial ──
+  const restoreItem = async (backup) => {
+    if (!backup) return;
+    await setDoc(doc(db, EQUIPOS_PATH, backup.id), backup.data);
+    for (const entry of backup.history) {
+      await addDoc(collection(db, EQUIPOS_PATH, backup.id, HISTORIAL), entry);
+    }
+    await addDoc(collection(db, EQUIPOS_PATH, backup.id, HISTORIAL), {
+      timestamp: Timestamp.now(),
+      user: user.email,
+      action: 'Equipo restaurado tras eliminarse por error.',
+    });
+    await deleteDoc(doc(db, EQUIPOS_ELIMINADOS_PATH, backup.tombstoneId));
+  };
+
+  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registerMaintenance };
 };
 
 export default useInventory;

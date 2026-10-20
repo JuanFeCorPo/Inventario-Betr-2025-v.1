@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { StatCard, StatusDot, Initials, NewBadge, Dropdown, Spinner, EmptyState, Button } from '../components/ui';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { StatCard, StatusDot, Initials, NewBadge, Dropdown, Spinner, EmptyState, Button, ToastHost } from '../components/ui';
 import { usePopover } from '../hooks/usePopover';
+import useToast from '../hooks/useToast';
 import {
   CheckCircle, PlusCircle, AlertTriangle,
   Box, Users, UserCheck, Archive, LogOut, ChevronRight, ChevronDown, X, Wrench, Search,
@@ -109,7 +110,7 @@ const EquipoCard = ({ item, onAction }) => (
 );
 
 // ── Menú de más opciones (móvil) ──────────────
-const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintenance }) => {
+const MobileMenu = ({ isAdmin, userEmail, role, exportLabel, onUsers, onExport, onImport, onReport, onMaintenance }) => {
   const { open, setOpen, ref, shown } = usePopover();
 
   const item = (icon, label, onClick, colorClass) => (
@@ -123,20 +124,21 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
   return (
     <div ref={ref} className="relative sm:hidden">
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Más opciones"
-        className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition shadow-sm hover:shadow-md">
+        className="w-10 h-10 flex items-center justify-center bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-xl transition shadow-sm hover:shadow-md">
         <MoreVertical size={16} />
       </button>
       {shown && (
         <div className={`absolute right-0 z-50 mt-2 w-64 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
           <div className="px-4 py-2.5 border-b border-brand-border bg-brand-bg/50">
-            <p className="text-xs font-semibold text-brand-gray uppercase tracking-wider">Más opciones</p>
+            <p className="text-sm font-semibold text-brand-ink truncate" title={userEmail}>{userEmail}</p>
+            <p className="text-xs text-brand-ember font-medium">{role}</p>
           </div>
           <div className="p-2 space-y-0.5">
             {isAdmin  && item(<Users size={15} />, 'Usuarios', onUsers, 'bg-slate-100 text-slate-600')}
             {item(<Wrench size={15} />, 'Mantenimientos', onMaintenance, 'bg-violet-100 text-violet-600')}
-            {item(<Download size={15} />, 'Exportar', onExport, 'bg-blue-100 text-blue-600')}
+            {item(<Download size={15} />, exportLabel, onExport, 'bg-blue-100 text-blue-600')}
             {isAdmin  && item(<Upload size={15} />, 'Importar', onImport, 'bg-emerald-100 text-emerald-600')}
-            {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport, 'bg-brand-orange/10 text-brand-orange')}
+            {isAdmin  && item(<FileSpreadsheet size={15} />, 'Generar reporte', onReport, 'bg-brand-orange/10 text-brand-ember')}
           </div>
         </div>
       )}
@@ -146,7 +148,7 @@ const MobileMenu = ({ isAdmin, onUsers, onExport, onImport, onReport, onMaintena
 
 // ── Menú "Más" (desktop) — agrupa las acciones menos frecuentes para que
 // el header no sea una fila de seis botones sueltos ──
-const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
+const MoreMenu = ({ isAdmin, exportLabel, onUsers, onExport, onImport, onReport }) => {
   const { open, setOpen, ref, shown } = usePopover();
 
   const row = (icon, label, onClick, colorClass) => (
@@ -160,16 +162,16 @@ const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
   return (
     <div ref={ref} className="relative hidden sm:block">
       <button type="button" onClick={() => setOpen(p => !p)} aria-expanded={open} aria-label="Más acciones"
-        className="flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition shadow-sm">
+        className="flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 h-10 rounded-xl transition shadow-sm">
         Más
         <ChevronDown size={14} className={`text-brand-gray transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {shown && (
         <div className={`absolute right-0 z-50 mt-2 w-56 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'} p-2 space-y-0.5`}>
           {isAdmin && row(<Users size={15} />, 'Usuarios', onUsers, 'bg-slate-100 text-slate-600')}
-          {row(<Download size={15} />, 'Exportar', onExport, 'bg-blue-100 text-blue-600')}
+          {row(<Download size={15} />, exportLabel, onExport, 'bg-blue-100 text-blue-600')}
           {isAdmin && row(<Upload size={15} />, 'Importar', onImport, 'bg-emerald-100 text-emerald-600')}
-          {isAdmin && row(<FileSpreadsheet size={15} />, 'Generar Reporte', onReport, 'bg-brand-orange/10 text-brand-orange')}
+          {isAdmin && row(<FileSpreadsheet size={15} />, 'Generar reporte', onReport, 'bg-brand-orange/10 text-brand-ember')}
         </div>
       )}
     </div>
@@ -179,7 +181,9 @@ const MoreMenu = ({ isAdmin, onUsers, onExport, onImport, onReport }) => {
 // ── Dashboard principal ──────────────────────
 const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   const isAdmin = user.role === 'Administrador';
-  const { items, loading, saveItem, deactivateItem, deleteItem, importItems, addNote } = useInventory(db, user);
+  const { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote } = useInventory(db, user);
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
+  const searchRef = useRef(null);
   const { encargados, addEncargado } = useEncargados(db);
   const { dismissedMap, dismissAlert } = useDismissedAlerts(db, user);
   const [modal,          setModal]          = useState({ type: null, data: null });
@@ -196,16 +200,41 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
     prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
 
+  // Tocar otra vez la tarjeta activa quita el filtro y vuelve a "Activos"
+  const toggleStatus = (estado) => setFilterStatus(prev => (prev === estado && estado !== 'Activos' ? 'Activos' : estado));
+
   const openModal  = (type, data = null) => setModal({ type, data });
   const closeModal = () => setModal({ type: null, data: null });
   // Si venías de editar desde el detalle, vuelve ahí en vez de mandarte a la
   // lista completa — con muchos equipos, tener que rebuscarlo era tedioso.
   const handleSave = async (data, motivoEstado) => {
+    const wasEdit = modal.type === 'edit';
     await saveItem(data, motivoEstado);
-    modal.type === 'edit' ? openModal('preview', data) : closeModal();
+    wasEdit ? openModal('preview', data) : closeModal();
+    showToast(wasEdit ? 'Cambios guardados' : 'Equipo añadido');
   };
-  const handleDeactivate = async (reason, fecha) => { await deactivateItem(modal.data.id, reason, fecha); closeModal(); };
-  const handleDelete     = async ()              => { await deleteItem(modal.data.id); closeModal(); };
+  const handleDeactivate = async (reason, fecha) => {
+    await deactivateItem(modal.data.id, reason, fecha);
+    closeModal();
+    showToast('Equipo dado de baja');
+  };
+  const handleDelete = async () => {
+    const nombre = modal.data.nombre;
+    const backup = await deleteItem(modal.data.id);
+    closeModal();
+    // Sin respaldo = el equipo ya no existía (otro usuario lo eliminó antes): no hay nada que deshacer
+    if (!backup) { showToast(`${nombre} ya no estaba en el inventario`); return; }
+    showToast(`${nombre} eliminado`, {
+      ms: 8000,
+      action: {
+        label: 'Deshacer',
+        onClick: async () => {
+          try { await restoreItem(backup); showToast(`${nombre} restaurado`); }
+          catch { showToast('No se pudo restaurar. Revisa tu conexión e inténtalo de nuevo.'); }
+        },
+      },
+    });
+  };
 
   // El modal guarda una foto del equipo al abrirse; esto la refresca con
   // los datos en vivo de Firestore para que, ej., una nota nueva se vea
@@ -265,11 +294,28 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
   );
 
   // Mosaico cuando no hay categoría ni búsqueda; la lista completa es opt-in.
-  const showMosaic = !loading && filterCategory === 'Todos' && !searchTerm && !showAllList;
+  const showMosaic = filterCategory === 'Todos' && !searchTerm && !showAllList;
   const backToMosaic = () => { setFilterCategory('Todos'); setShowAllList(false); };
 
   const hasFilters = searchTerm !== '' || filterCategory !== 'Todos' || filterStatus !== 'Activos';
   const clearFilters = () => { setSearchTerm(''); setFilterCategory('Todos'); setFilterStatus('Activos'); setShowAllList(false); };
+  // Exportar baja la vista filtrada si hay filtros; sin filtros, todo el inventario (sirve de plantilla de importación)
+  const exportItems = hasFilters ? filteredItems : items;
+  const exportLabel = hasFilters ? `Exportar vista (${filteredItems.length})` : 'Exportar';
+
+  // Atajos: "/" busca, "N" añade. Se ignoran al escribir en un campo y con un modal abierto.
+  const modalOpen = modal.type !== null || showImport || showReport;
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || modalOpen) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+      if (e.key === '/') { e.preventDefault(); searchRef.current?.focus(); }
+      else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openModal('add'); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [modalOpen]);
+
   const emptyResults = (
     <EmptyState icon={<Search size={28} />} title="No hay equipos con estos filtros."
       action={hasFilters && <Button variant="secondary" size="sm" onClick={clearFilters}>Limpiar filtros</Button>} />
@@ -293,33 +339,34 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                 Inventario Betr Media
               </h1>
               <p className="text-xs text-brand-gray truncate hidden sm:block">
-                {user.email} · <span className="text-brand-orange font-medium">{user.role}</span>
+                {user.email} · <span className="text-brand-ember font-medium">{user.role}</span>
               </p>
             </div> 
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <AlertsBell alerts={alerts} onGoTo={goToAlert} onDismiss={dismissAlert} />
-            <MobileMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
-              onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
+            <MobileMenu isAdmin={isAdmin} userEmail={user.email} role={user.role} exportLabel={exportLabel}
+              onUsers={() => onNavigate('users')} onMaintenance={() => onNavigate('maintenance')}
+              onExport={() => exportInventory(exportItems)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
             <button onClick={() => onNavigate('maintenance')} aria-label="Ver mantenimientos preventivos" title="Mantenimientos preventivos"
-              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 py-2.5 rounded-xl transition shadow-sm relative">
+              className="hidden sm:flex items-center gap-2 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate text-sm px-4 h-10 rounded-xl transition shadow-sm relative">
               <Wrench size={15} /> Mantenimientos
               {maintenanceOverdue > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-rose-600 text-white text-[10px] font-bold rounded-full">
                   {maintenanceOverdue}
                 </span>
               )}
             </button>
-            <MoreMenu isAdmin={isAdmin} onUsers={() => onNavigate('users')}
-              onExport={() => exportInventory(items)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
-            <button onClick={() => openModal('add')} aria-label="Añadir equipo"
-              className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-3 sm:px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30">
+            <MoreMenu isAdmin={isAdmin} exportLabel={exportLabel} onUsers={() => onNavigate('users')}
+              onExport={() => exportInventory(exportItems)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
+            <button onClick={() => openModal('add')} aria-label="Añadir equipo" title="Añadir equipo (N)"
+              className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-brand-ink text-sm font-semibold px-3 sm:px-4 h-10 min-w-10 justify-center rounded-xl transition shadow-md hover:shadow-brand-orange/30">
               <PlusCircle size={15} />
-              <span className="hidden sm:inline">Añadir Equipo</span>
+              <span className="hidden sm:inline">Añadir equipo</span>
             </button>
             <button onClick={onLogout} aria-label="Cerrar sesión"
-              className="p-2.5 bg-white hover:bg-rose-50 border border-brand-border hover:border-rose-200 text-brand-gray hover:text-rose-500 rounded-xl transition shadow-sm"
+              className="w-10 h-10 flex items-center justify-center bg-white hover:bg-rose-50 border border-brand-border hover:border-rose-200 text-brand-gray hover:text-rose-500 rounded-xl transition shadow-sm"
               title="Cerrar sesión">
               <LogOut size={16} />
             </button>
@@ -328,34 +375,31 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
 
         {/* ── Stat Cards ─────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-5 stagger-in">
-          <StatCard title="Activos"      value={stats.total}           icon={<Box size={16} className="text-brand-orange"/>}          accent="bg-brand-orange/10"  onClick={() => setFilterStatus('Activos')} />
-          <StatCard title="Disponibles"  value={stats.disponibles}     icon={<CheckCircle size={16} className="text-emerald-600"/>} accent="bg-emerald-50"    onClick={() => setFilterStatus('Disponible')} />
-          <StatCard title="En Uso"       value={stats.enUso}           icon={<UserCheck size={16} className="text-amber-600"/>}         accent="bg-amber-50"      onClick={() => setFilterStatus('En Uso')} />
-          <StatCard title="Mantenimiento"      value={stats.enMantenimiento} icon={<Wrench size={16} className="text-violet-600"/>}       accent="bg-violet-50"     onClick={() => setFilterStatus('En Mantenimiento')} />
-          <StatCard title="Fuera de servicio" value={stats.fueraServicio}   icon={<AlertTriangle size={16} className="text-rose-500"/>}  accent="bg-rose-50"       onClick={() => setFilterStatus('Fuera de Servicio')} />
-          <StatCard title="De Baja"      value={stats.deBaja}          icon={<Archive size={16} className="text-brand-gray"/>}       accent="bg-brand-gray/10"  onClick={() => setFilterStatus('De Baja')} />
+          <StatCard title="Activos"      value={stats.total}           icon={<Box size={16} className="text-brand-ember"/>}          accent="bg-brand-orange/10"  onClick={() => toggleStatus('Activos')} active={filterStatus === 'Activos'} loading={loading} />
+          <StatCard title="Disponibles"  value={stats.disponibles}     icon={<CheckCircle size={16} className="text-emerald-600"/>} accent="bg-emerald-50"    onClick={() => toggleStatus('Disponible')} active={filterStatus === 'Disponible'} loading={loading} />
+          <StatCard title="En Uso"       value={stats.enUso}           icon={<UserCheck size={16} className="text-blue-600"/>}          accent="bg-blue-50"      onClick={() => toggleStatus('En Uso')} active={filterStatus === 'En Uso'} loading={loading} />
+          <StatCard title="En mantenimiento" value={stats.enMantenimiento} icon={<Wrench size={16} className="text-violet-600"/>}       accent="bg-violet-50"     onClick={() => toggleStatus('En Mantenimiento')} active={filterStatus === 'En Mantenimiento'} loading={loading} />
+          <StatCard title="Fuera de servicio" value={stats.fueraServicio}   icon={<AlertTriangle size={16} className="text-rose-500"/>}  accent="bg-rose-50"       onClick={() => toggleStatus('Fuera de Servicio')} active={filterStatus === 'Fuera de Servicio'} loading={loading} />
+          <StatCard title="De Baja"      value={stats.deBaja}          icon={<Archive size={16} className="text-brand-gray"/>}       accent="bg-brand-gray/10"  onClick={() => toggleStatus('De Baja')} active={filterStatus === 'De Baja'} loading={loading} />
         </div>
 
         {/* ── Contenido + barra lateral del gráfico ── */}
         <div className="grid grid-cols-1 2xl:grid-cols-[1fr_300px] gap-4 items-start">
 
-        {/* Gráfico + mantenimientos: arriba en móvil/tablet/laptop, barra lateral derecha solo en pantallas muy anchas */}
-        <div className="2xl:col-start-2 2xl:row-start-1 space-y-4">
-          <EquipmentAgeChart items={items} />
-          <UpcomingMaintenanceCard items={items} onNavigate={onNavigate} />
-        </div>
-
         <div className="2xl:col-start-1 2xl:row-start-1 min-w-0">
 
         {/* ── Filtros ────────────────────────── */}
-        <div className="bg-white border border-brand-border rounded-2xl p-3 sm:p-4 mb-4 shadow-sm">
+        <div className="bg-white border border-brand-border rounded-2xl p-3 sm:p-4 mb-4 shadow-card">
           {/* Barra superior siempre visible */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              <input ref={searchRef} type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar equipo…"
                 className="w-full bg-brand-bg border border-brand-border text-brand-ink placeholder-brand-gray text-sm pl-9 pr-8 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-orange/40 transition" />
+              {!searchTerm && (
+                <kbd className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center justify-center w-5 h-5 text-xs font-mono text-brand-gray border border-brand-border rounded bg-white pointer-events-none" aria-hidden="true">/</kbd>
+              )}
               {searchTerm && (
                 <button onClick={() => setSearchTerm('')} aria-label="Limpiar búsqueda" className="animate-fade-in absolute right-3 top-1/2 -translate-y-1/2 text-brand-gray hover:text-brand-ink">
                   <X size={14} />
@@ -367,38 +411,29 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
             <button onClick={() => setMobileFilters(p => !p)} aria-label="Mostrar filtros"
               className="sm:hidden flex items-center gap-1.5 bg-brand-bg border border-brand-border text-brand-slate text-sm px-3 py-2.5 rounded-xl transition flex-shrink-0">
               <Menu size={15} />
-              {filterCategory !== 'Todos' && (
+              {(filterCategory !== 'Todos' || filterStatus !== 'Activos') && (
                 <span className="w-1.5 h-1.5 bg-brand-orange rounded-full" />
               )}
             </button>
 
             {/* Dropdowns en desktop */}
             <div className="hidden sm:flex items-center gap-2">
-              <Dropdown value={filterCategory} onChange={setFilterCategory} options={categorias} />
+              <Dropdown label="Categoría" value={filterCategory} onChange={setFilterCategory} options={categorias} />
+              <Dropdown label="Estado" value={filterStatus} onChange={setFilterStatus} options={STATUS_FILTERS} />
               {filterCategory !== 'Todos' && (
                 <span className="text-xs text-brand-slate bg-brand-bg border border-brand-border px-3 py-2.5 rounded-xl whitespace-nowrap">
-                  <span className="font-bold text-brand-orange">{categoryCount}</span>
+                  <span className="font-bold text-brand-ember">{categoryCount}</span>
                 </span>
               )}
             </div>
 
           </div>
 
-          {/* Chips de estado: siempre a la vista (desplazables en celular) */}
-          <div className="flex gap-1.5 overflow-x-auto mt-3 -mx-1 px-1 pb-0.5">
-            {STATUS_FILTERS.map(s => (
-              <button key={s} type="button" onClick={() => setFilterStatus(s)} aria-pressed={filterStatus === s}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors flex-shrink-0
-                  ${filterStatus === s ? 'bg-brand-ink text-white border-brand-ink' : 'bg-white text-brand-slate border-brand-border hover:bg-brand-bg'}`}>
-                {s}
-              </button>
-            ))}
-          </div>
-
           {/* Filtros expandibles en móvil */}
           {mobileFilters && (
             <div className="sm:hidden mt-3 pt-3 border-t border-brand-border flex flex-col gap-2 animate-reveal">
-              <Dropdown value={filterCategory} onChange={setFilterCategory} options={categorias} />
+              <Dropdown label="Categoría" value={filterCategory} onChange={setFilterCategory} options={categorias} />
+              <Dropdown label="Estado" value={filterStatus} onChange={setFilterStatus} options={STATUS_FILTERS} />
               <p className="text-xs text-brand-gray text-right">
                 {filteredItems.length} equipo{filteredItems.length !== 1 ? 's' : ''}
               </p>
@@ -407,9 +442,11 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </div>
 
         {/* ── Mosaico de categorías (primer nivel) ── */}
-        {showMosaic && (filteredItems.length === 0
-          ? <div className="bg-white border border-brand-border rounded-2xl">{emptyResults}</div>
-          : <CategoryMosaic items={filteredItems} onSelect={setFilterCategory} onShowAll={() => setShowAllList(true)} />)}
+        {showMosaic && (loading
+          ? <CategoryMosaic loading />
+          : filteredItems.length === 0
+            ? <div className="bg-white border border-brand-border rounded-2xl shadow-card">{emptyResults}</div>
+            : <CategoryMosaic items={filteredItems} onSelect={setFilterCategory} onShowAll={() => setShowAllList(true)} />)}
 
         {/* ── Volver al mosaico ─────────────────── */}
         {!showMosaic && !searchTerm && (
@@ -442,7 +479,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </div>
 
         {/* ── Vista desktop: tabla ────────────── */}
-        <div className="hidden sm:block bg-white border border-brand-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="hidden sm:block bg-white border border-brand-border rounded-2xl overflow-hidden shadow-card">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -455,7 +492,7 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
                         <button type="button" onClick={() => toggleSort(key)}
                           className={`flex items-center gap-1 hover:text-brand-ink transition-colors ${center ? 'mx-auto' : ''} ${active ? 'text-brand-ink' : ''}`}>
                           {label}
-                          <SortIcon size={12} className={active ? 'text-brand-orange' : 'text-brand-gray/50'} />
+                          <SortIcon size={12} className={active ? 'text-brand-ember' : 'text-brand-gray/50'} />
                         </button>
                       </th>
                     );
@@ -482,8 +519,16 @@ const InventoryDashboard = ({ user, onLogout, db, onNavigate }) => {
         </>)}
 
         </div>
+
+        {/* Resúmenes: franja bajo la lista; barra lateral derecha solo en pantallas muy anchas */}
+        <div className="2xl:col-start-2 2xl:row-start-1 grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-1 gap-4 items-start">
+          <UpcomingMaintenanceCard items={items} onNavigate={onNavigate} loading={loading} />
+          <EquipmentAgeChart items={items} loading={loading} />
+        </div>
         </div>
       </div>
+
+      <ToastHost toast={toast} onDismiss={dismissToast} />
 
       <ItemFormModal isOpen={modal.type === 'add' || modal.type === 'edit'} onClose={closeModal} onSave={handleSave} currentItem={modal.data} items={items}
         encargados={encargados} onAddEncargado={addEncargado} />

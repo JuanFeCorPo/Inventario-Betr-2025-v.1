@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Button } from '../ui';
+import { Modal, Button, FormError, FormActions } from '../ui';
 import { parseInventoryExcel } from '../../utils/excel';
 import { Upload, AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
@@ -64,18 +64,30 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
 
   const handleConfirm = async () => {
     setStep('importing');
+    setFileError('');
     const toImport = rows.filter(r => selected.has(r._row))
       .map(({ errors, warnings, _row, ...data }) => data);
-    await onImport(toImport);
-    setImportedCount(toImport.length);
-    setStep('done');
+    try {
+      await onImport(toImport);
+      setImportedCount(toImport.length);
+      setStep('done');
+    } catch (err) {
+      // Antes el modal se quedaba en "Importando…" para siempre; ahora vuelve a la vista previa con el error
+      console.error(err);
+      setFileError('No se pudo importar. Revisa tu conexión o tus permisos e inténtalo de nuevo.');
+      setStep('preview');
+    }
   };
+
+  const selectableRows = rows.filter(r => r.errors.length === 0);
+  const allSelected = selectableRows.length > 0 && selectableRows.every(r => selected.has(r._row));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableRows.map(r => r._row)));
 
   const validCount   = rows.filter(r => r.errors.length === 0).length;
   const invalidCount = rows.length - validCount;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Importar Inventario desde Excel" size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Importar inventario desde Excel" size="lg">
       {step === 'upload' && (
         <div className="space-y-4">
           <p className="text-brand-slate text-sm">
@@ -87,12 +99,10 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
             <span className="text-sm text-brand-slate">Haz clic para seleccionar un archivo .xlsx</span>
             <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
           </label>
-          {fileError && (
-            <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">{fileError}</p>
-          )}
-          <div className="flex justify-end gap-3 pt-2">
+          <FormError>{fileError}</FormError>
+          <FormActions>
             <Button variant="secondary" onClick={handleClose}>Cancelar</Button>
-          </div>
+          </FormActions>
         </div>
       )}
 
@@ -110,7 +120,10 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-brand-bg">
                 <tr>
-                  <th className="px-3 py-2"></th>
+                  <th className="px-3 py-2">
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={selectableRows.length === 0}
+                      aria-label="Seleccionar todas las filas válidas" title="Seleccionar todas las filas válidas" />
+                  </th>
                   <th className="px-3 py-2">Fila</th>
                   <th className="px-3 py-2">Nombre</th>
                   <th className="px-3 py-2">Categoría</th>
@@ -126,7 +139,7 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
                   <tr key={row._row} className={row.errors.length > 0 ? 'bg-rose-50/50' : row.warnings.length > 0 ? 'bg-amber-50/50' : ''}>
                     <td className="px-3 py-2">
                       <input type="checkbox" checked={selected.has(row._row)} disabled={row.errors.length > 0}
-                        onChange={() => toggleRow(row)} />
+                        onChange={() => toggleRow(row)} aria-label={`Seleccionar la fila ${row._row}`} />
                     </td>
                     <td className="px-3 py-2 text-brand-gray">{row._row}</td>
                     <td className="px-3 py-2 text-brand-ink font-medium">{row.nombre || '—'}</td>
@@ -137,10 +150,10 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
                     <td className="px-3 py-2 text-brand-slate">{row.fechaIngreso || '—'}</td>
                     <td className="px-3 py-2">
                       {row.errors.map((e, i) => (
-                        <div key={i} className="flex items-center gap-1 text-rose-600"><XCircle size={11} className="flex-shrink-0" />{e}</div>
+                        <div key={i} className="flex items-center gap-1 text-rose-700"><XCircle size={11} className="flex-shrink-0" />{e}</div>
                       ))}
                       {row.warnings.map((w, i) => (
-                        <div key={i} className="flex items-center gap-1 text-amber-600"><AlertTriangle size={11} className="flex-shrink-0" />{w}</div>
+                        <div key={i} className="flex items-center gap-1 text-amber-800"><AlertTriangle size={11} className="flex-shrink-0" />{w}</div>
                       ))}
                     </td>
                   </tr>
@@ -149,18 +162,19 @@ const ImportModal = ({ isOpen, onClose, items, onImport }) => {
             </table>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <FormError>{fileError}</FormError>
+          <FormActions>
             <Button variant="secondary" onClick={handleClose}>Cancelar</Button>
             <Button variant="primary" disabled={selected.size === 0} onClick={handleConfirm}>
               Importar {selected.size} equipo{selected.size !== 1 ? 's' : ''}
             </Button>
-          </div>
+          </FormActions>
         </div>
       )}
 
       {step === 'importing' && (
         <div className="flex flex-col items-center gap-3 py-16 text-brand-gray">
-          <Loader2 size={28} className="animate-spin text-brand-orange" />
+          <Loader2 size={28} className="animate-spin text-brand-ember" />
           <span className="text-sm">Importando equipos…</span>
         </div>
       )}

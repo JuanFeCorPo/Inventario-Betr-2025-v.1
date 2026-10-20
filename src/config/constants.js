@@ -31,10 +31,11 @@ export const ESTADOS = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Se
 // aunque haya vuelto a quedar "Disponible" (ej. renuncia de un colaborador).
 export const CONDICIONES = ['Nuevo', 'Usado'];
 
-// Badges por estado — fondo suave + texto de color
+// Badges por estado — fondo suave + texto de color.
+// Rojo y violeta son los estados que piden acción; verde y azul son lo normal; el ámbar queda solo para avisos.
 export const ESTADO_STYLES = {
   'Disponible':         'bg-emerald-100  text-emerald-700  border border-emerald-200',
-  'En Uso':             'bg-amber-100    text-amber-700    border border-amber-200',
+  'En Uso':             'bg-blue-100     text-blue-800     border border-blue-200',
   'En Mantenimiento':   'bg-violet-100   text-violet-700   border border-violet-200',
   'Fuera de Servicio':  'bg-rose-100     text-rose-700     border border-rose-200',
   'De Baja':            'bg-gray-100     text-gray-500     border border-gray-200',
@@ -43,7 +44,7 @@ export const ESTADO_STYLES = {
 // Punto de color por estado (listas densas, mosaico de categorías)
 export const STATUS_DOT = {
   'Disponible':        'bg-emerald-500',
-  'En Uso':            'bg-amber-500',
+  'En Uso':            'bg-blue-500',
   'En Mantenimiento':  'bg-violet-500',
   'Fuera de Servicio': 'bg-rose-500',
   'De Baja':           'bg-gray-400',

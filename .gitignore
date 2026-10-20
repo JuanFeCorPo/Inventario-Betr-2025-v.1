@@ -25,3 +25,9 @@ dist-ssr
 
 # Configuración local de Claude (no se sube)
 .claude/
+
+# Herramientas de diseño: solo locales
+.impeccable/
+.github/agents/
+.github/hooks/
+.github/skills/

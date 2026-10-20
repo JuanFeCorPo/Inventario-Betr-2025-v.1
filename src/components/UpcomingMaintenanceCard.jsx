@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Wrench, ChevronRight } from 'lucide-react';
-import { getUpcomingMaintenance } from '../utils/maintenance';
+import { getUpcomingMaintenance, summarizeOverdue } from '../utils/maintenance';
+import { Skeleton } from './ui';
 
 const URGENCIA_DOT = {
   'vencido':     'bg-rose-500',
@@ -15,24 +16,42 @@ const formatDiasRestantes = (dias) => {
   return `En ${dias} d`;
 };
 
-// ── Adelanto de los próximos mantenimientos preventivos en el dashboard ──
-// Evita tener que entrar a la pantalla de Mantenimientos solo para ver
-// qué sigue; "Ver todos" lleva a la pantalla completa para registrar.
-const UpcomingMaintenanceCard = ({ items, onNavigate }) => {
-  const upcoming = useMemo(() => getUpcomingMaintenance(items, 5), [items]);
+// ── Adelanto de los mantenimientos preventivos en el dashboard ──
+// Empieza por lo que más pesa: cuántos están vencidos y cuánto lleva el peor.
+// "Ver todos" lleva a la pantalla completa para registrarlos.
+const UpcomingMaintenanceCard = ({ items, onNavigate, loading = false }) => {
+  const upcoming = useMemo(() => getUpcomingMaintenance(items, 4), [items]);
+  const { vencidos, masAntiguoDias } = useMemo(() => summarizeOverdue(items), [items]);
 
   return (
-    <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-sm">
+    <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-card">
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <Wrench size={15} className="text-brand-orange" />
-          <p className="text-sm font-semibold text-brand-ink">Próximos Mantenimientos</p>
+          <Wrench size={15} className="text-brand-ember" />
+          <p className="text-sm font-semibold text-brand-ink">Mantenimientos</p>
         </div>
         <button onClick={() => onNavigate('maintenance')}
-          className="text-xs text-brand-orange font-medium hover:underline flex items-center gap-0.5 flex-shrink-0">
+          className="text-xs text-brand-ember font-medium hover:underline flex items-center gap-0.5 flex-shrink-0">
           Ver todos <ChevronRight size={12} />
         </button>
       </div>
+
+      {loading ? (
+        <div aria-busy="true" className="space-y-3">
+          <Skeleton className="h-[68px] w-full rounded-xl" />
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-3 w-full" />)}
+        </div>
+      ) : (<>
+      {vencidos > 0 && (
+        <button type="button" onClick={() => onNavigate('maintenance')}
+          className="w-full text-left flex items-baseline gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-3 mb-3 hover:bg-rose-100/70 transition-colors">
+          <span className="text-3xl font-bold text-rose-700 tabular-nums leading-none">{vencidos}</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-rose-800">vencido{vencidos !== 1 ? 's' : ''}</span>
+            <span className="block text-xs text-rose-700">el más antiguo, hace {masAntiguoDias} día{masAntiguoDias !== 1 ? 's' : ''}</span>
+          </span>
+        </button>
+      )}
 
       {upcoming.length === 0 ? (
         <p className="text-center text-sm text-brand-gray italic py-4">Sin mantenimientos pendientes.</p>
@@ -42,11 +61,12 @@ const UpcomingMaintenanceCard = ({ items, onNavigate }) => {
             <li key={item.id} className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${URGENCIA_DOT[info.urgencia]}`} />
               <span className="text-xs text-brand-slate truncate flex-1">{item.nombre}</span>
-              <span className="text-xs font-medium text-brand-ink flex-shrink-0">{formatDiasRestantes(info.diasRestantes)}</span>
+              <span className="text-xs font-medium text-brand-ink flex-shrink-0 tabular-nums">{formatDiasRestantes(info.diasRestantes)}</span>
             </li>
           ))}
         </ul>
       )}
+      </>)}
     </div>
   );
 };

@@ -201,7 +201,7 @@ Paleta de marca definida en `tailwind.config.js` bajo el namespace `brand`:
 | `brand-bg` | `#F0F2F4` | fondo de la app |
 | `brand-border` | `#E8EAED` | bordes |
 
-Tipografía: **Inter** (Google Fonts) en toda la app — se migró desde una fuente vía CDN externo (`fonts.cdnfonts.com`) por caídas intermitentes que afectaban el layout.
+Tipografía: **IBM Plex Sans** en toda la app y **IBM Plex Mono** solo para códigos (Nº de inventario y serial). Se sirven desde el propio sitio con `@fontsource` (importadas en `src/main.jsx`: pesos 400/500/600/700 y 400/500/600, solo alfabeto latino), sin CDN externo: las fuentes externas (primero `fonts.cdnfonts.com`, luego Google Fonts) cambiaban el ancho del texto entre visitas y descuadraban el layout. Tablas con cifras de ancho fijo (`tabular-nums`).
 
 Estados de equipo con badges de color fijos (`ESTADO_STYLES` en `constants.js`): verde=Disponible, ámbar=En Uso, violeta=En Mantenimiento, rosa=Fuera de Servicio, gris=De Baja.
 

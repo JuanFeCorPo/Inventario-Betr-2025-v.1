@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
-  signOut, setPersistence, browserSessionPersistence,
+  signOut, setPersistence, browserSessionPersistence, sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -96,6 +96,9 @@ export default function App() {
     }
   };
 
+  // Envía el enlace para crear una contraseña nueva (lo gestiona Firebase Auth).
+  const handleResetPassword = (email) => sendPasswordResetEmail(auth, email);
+
   const handleLogout = () => { setScreen('dashboard'); signOut(auth); };
 
   // El control de inactividad vive aquí y no en el dashboard: antes, al entrar
@@ -113,7 +116,7 @@ export default function App() {
   }
 
   if (hasError) return <ConfigErrorScreen />;
-  if (!user)    return <LoginScreen onLogin={handleLogin} accessError={authError} />;
+  if (!user)    return <LoginScreen onLogin={handleLogin} onResetPassword={handleResetPassword} accessError={authError} />;
 
   const screenEl = (screen === 'users' && user.role === 'Administrador')
     ? <UsersScreen db={db} currentUser={user} onBack={() => setScreen('dashboard')} />

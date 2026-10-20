@@ -14,9 +14,9 @@ const AlertsBell = ({ alerts, onGoTo, onDismiss }) => {
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Alertas del inventario" title="Alertas del inventario"
-        className="relative p-2.5 bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-full transition shadow-sm hover:shadow-md">
+        className="relative w-10 h-10 flex items-center justify-center bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-xl transition shadow-sm hover:shadow-md">
         <Bell size={16} />
-        <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold text-white rounded-full ${hasHigh ? 'bg-rose-500' : 'bg-amber-500'}`}>
+        <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold rounded-full ${hasHigh ? 'bg-rose-600 text-white' : 'bg-amber-500 text-brand-ink'}`}>
           {alerts.length}
         </span>
       </button>
@@ -24,7 +24,7 @@ const AlertsBell = ({ alerts, onGoTo, onDismiss }) => {
       {shown && (
         <div className={`fixed inset-x-4 top-20 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-80 z-50 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 overflow-hidden ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-brand-border bg-brand-bg/50">
-            <Bell size={14} className="text-brand-orange" />
+            <Bell size={14} className="text-brand-ember" />
             <p className="text-sm font-semibold text-brand-ink">Alertas del inventario</p>
           </div>
           <div className="max-h-[60vh] overflow-y-auto p-2 space-y-2">

@@ -1,13 +1,14 @@
 import { useState, useMemo, useRef } from 'react';
-import { Modal, Button, StatusBadge, NewBadge } from '../ui';
+import { Modal, Button, StatusBadge, NewBadge, FormError, Spinner } from '../ui';
 import HistoryTimeline from '../HistoryTimeline';
 import { exportItemHistory } from '../../utils/excel';
 import useEquipoHistorial from '../../hooks/useEquipoHistorial';
 import { getMaintenanceInfo } from '../../utils/maintenance';
 import { formatFecha } from '../../utils/format';
-import { fieldClassSm } from '../ui/fieldClasses';
+import { fieldClass } from '../ui/fieldClasses';
+import useAsyncAction from '../../hooks/useAsyncAction';
 import { CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
-import { Edit, Archive, Trash2, StickyNote, Download, Loader2 } from 'lucide-react';
+import { Edit, Archive, Trash2, StickyNote, Download } from 'lucide-react';
 
 const Field = ({ label, value }) => (
   <div>
@@ -19,7 +20,7 @@ const Field = ({ label, value }) => (
 const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote }) => {
   const [noteOpen,   setNoteOpen]   = useState(false);
   const [note,       setNote]       = useState('');
-  const [savingNote, setSavingNote] = useState(false);
+  const { busy: savingNote, error: noteError, run: runNote, reset: resetNote } = useAsyncAction();
 
   // Al cerrar, el padre limpia el equipo: se conserva el último para que la salida animada tenga contenido.
   const lastItem = useRef(itemProp);
@@ -43,17 +44,17 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
 
   const maintenanceInfo = getMaintenanceInfo(item);
 
-  const handleAddNote = async () => {
+  const handleAddNote = () => {
     if (!note.trim()) return;
-    setSavingNote(true);
-    await onAddNote(item.id, note.trim());
-    setNote('');
-    setNoteOpen(false);
-    setSavingNote(false);
+    runNote(async () => {
+      await onAddNote(item.id, note.trim());
+      setNote('');
+      setNoteOpen(false);
+    }, 'No se pudo guardar la nota. Revisa tu conexión e inténtalo de nuevo.');
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Detalle del Equipo" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Detalle del equipo" size="lg">
       <div className="space-y-5">
         {/* Encabezado */}
         <div className="flex items-start justify-between gap-3">
@@ -71,16 +72,16 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-brand-bg/60 border border-brand-border rounded-xl p-4">
           <Field label="Categoría" value={item.categoria} />
           <Field label="Condición" value={item.condicion ?? 'Usado'} />
-          <Field label="N° Inventario" value={item.numeroInventario} />
-          <Field label="N° Serial" value={item.numeroSerial} />
-          <Field label="Persona Encargada" value={item.personaEncargada} />
-          <Field label="Fecha de Ingreso" value={item.fechaIngreso?.toDate ? formatFecha(item.fechaIngreso.toDate()) : '—'} />
+          <Field label="Nº de inventario" value={item.numeroInventario} />
+          <Field label="Nº de serial" value={item.numeroSerial} />
+          <Field label="Encargado" value={item.personaEncargada} />
+          <Field label="Fecha de ingreso" value={item.fechaIngreso?.toDate ? formatFecha(item.fechaIngreso.toDate()) : '—'} />
           {item.estado === 'De Baja' && (
-            <Field label="Fecha de Baja" value={item.fecha_baja?.toDate ? formatFecha(item.fecha_baja.toDate()) : '—'} />
+            <Field label="Fecha de baja" value={item.fecha_baja?.toDate ? formatFecha(item.fecha_baja.toDate()) : '—'} />
           )}
-          {item.motivo_baja && <Field label="Motivo de Baja" value={item.motivo_baja} />}
+          {item.motivo_baja && <Field label="Motivo de baja" value={item.motivo_baja} />}
           {maintenanceInfo && (
-            <Field label="Próximo Mantenimiento"
+            <Field label="Próximo mantenimiento"
               value={`${formatFecha(maintenanceInfo.proximaFecha)} ${maintenanceInfo.urgencia === 'vencido' ? '(vencido)' : ''}`} />
           )}
           {item.sinMantenimiento === true && (
@@ -114,8 +115,8 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
             <p className="text-sm font-semibold text-brand-ink">Trazabilidad</p>
             <div className="flex items-center gap-2">
               {isAdmin && (
-                <button onClick={() => setNoteOpen(p => !p)}
-                  className="flex items-center gap-1.5 text-xs text-brand-orange bg-brand-orange/10 px-3 py-1.5 rounded-lg font-medium hover:bg-brand-orange/20 transition-colors">
+                <button onClick={() => { setNoteOpen(p => !p); resetNote(); }} aria-expanded={noteOpen}
+                  className="flex items-center gap-1.5 text-xs text-brand-ember bg-brand-orange/10 px-3 py-1.5 rounded-lg font-medium hover:bg-brand-orange/20 transition-colors">
                   <StickyNote size={12} /> Agregar nota
                 </button>
               )}
@@ -127,13 +128,17 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
           </div>
 
           {noteOpen && (
-            <div className="flex items-center gap-2 mb-3 animate-reveal">
-              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Escribe una nota…"
-                onKeyDown={e => e.key === 'Enter' && handleAddNote()}
-                className={`${fieldClassSm} flex-1 !py-2`} />
-              <Button variant="primary" size="sm" className="flex items-center gap-1.5" disabled={savingNote || !note.trim()} onClick={handleAddNote}>
-                {savingNote && <Loader2 size={13} className="animate-spin" />} Guardar
-              </Button>
+            <div className="mb-3 animate-reveal space-y-2">
+              <div className="flex items-center gap-2">
+                <input value={note} onChange={e => setNote(e.target.value)} placeholder="Escribe una nota…"
+                  aria-label="Nota para la trazabilidad" autoFocus autoComplete="off"
+                  onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                  className={`${fieldClass} flex-1`} />
+                <Button variant="primary" size="sm" className="flex items-center gap-1.5" disabled={savingNote || !note.trim()} onClick={handleAddNote}>
+                  {savingNote && <Spinner size="sm" tone="dark" />} Guardar
+                </Button>
+              </div>
+              <FormError>{noteError}</FormError>
             </div>
           )}
 
@@ -150,7 +155,7 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
             </Button>
             {item.estado !== 'De Baja' && (
               <Button variant="secondary" onClick={onDeactivate} className="flex items-center gap-1.5">
-                <Archive size={14} /> Dar de Baja
+                <Archive size={14} /> Dar de baja
               </Button>
             )}
             <Button variant="primary" onClick={onEdit} className="flex items-center gap-1.5">

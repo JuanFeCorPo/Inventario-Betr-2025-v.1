@@ -7,16 +7,18 @@ import {
   ToggleLeft, ToggleRight, Loader2, UserCheck,
   UserX, UserPlus, X, History, AlertTriangle
 } from 'lucide-react';
-import { Button, Modal, EmptyState } from '../components/ui';
-import { fieldClassSm } from '../components/ui/fieldClasses';
+import { Button, Modal, EmptyState, Field, FormActions, Spinner, ToastHost } from '../components/ui';
+import { fieldClass } from '../components/ui/fieldClasses';
 import { HistoryModal } from '../components/modals/OtherModals';
+import useAsyncAction from '../hooks/useAsyncAction';
+import useToast from '../hooks/useToast';
 
 const ROLES = ['Lector', 'Administrador'];
 
 const RoleBadge = ({ role }) => (
   <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border
     ${role === 'Administrador'
-      ? 'bg-brand-orange/10 text-brand-orange border-brand-orange/20'
+      ? 'bg-brand-orange/10 text-brand-ember border-brand-orange/20'
       : 'bg-brand-slate/10 text-brand-slate border-brand-slate/20'}`}>
     {role === 'Administrador' ? <Shield size={10} /> : <BookOpen size={10} />}
     {role}
@@ -28,74 +30,51 @@ const AddUserModal = ({ isOpen, onClose, onAdd }) => {
   const [uid,    setUid]    = useState('');
   const [email,  setEmail]  = useState('');
   const [role,   setRole]   = useState('Lector');
-  const [saving, setSaving] = useState(false);
-  const [result, setResult] = useState(null); // 'ok' | 'error'
+  const [errors, setErrors] = useState({});
+  const { busy, error, run, reset } = useAsyncAction();
 
-  const reset = () => { setUid(''); setEmail(''); setRole('Lector'); setResult(null); };
-  const handleClose = () => { reset(); onClose(); };
+  useEffect(() => {
+    if (isOpen) { setUid(''); setEmail(''); setRole('Lector'); setErrors({}); reset(); }
+  }, [isOpen, reset]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!uid.trim() || !email.trim()) return;
-    setSaving(true);
-    setResult(null);
-    try {
-      await onAdd({ uid: uid.trim(), email: email.trim(), role });
-      setResult('ok');
-      setTimeout(() => handleClose(), 1800);
-    } catch {
-      setResult('error');
-      setSaving(false);
-    }
+    const next = {};
+    if (!uid.trim()) next.uid = 'Pega el UID del usuario.';
+    if (!email.trim()) next.email = 'Escribe el correo del usuario.';
+    else if (!/^\S+@\S+\.\S+$/.test(email.trim())) next.email = 'Revisa el correo: falta el @ o el dominio.';
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    run(() => onAdd({ uid: uid.trim(), email: email.trim(), role }),
+      'No se pudo registrar. Verifica que el UID sea correcto y que tengas permisos de Administrador.');
   };
 
-  const f = fieldClassSm;
-
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Registrar Usuario" size="sm">
-      <p className="text-xs text-brand-gray -mt-4 mb-6" title="El UID está en Firebase Console → Authentication → Users">
-        UID y email del usuario creado en Firebase Auth.
-      </p>
-
-      {/* Feedback */}
-      {result === 'ok' && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-2">
-          <UserCheck size={16} className="text-emerald-600 flex-shrink-0" />
-          <p className="text-emerald-700 text-sm font-medium">Usuario registrado correctamente.</p>
-        </div>
-      )}
-      {result === 'error' && (
-        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-center gap-2">
-          <UserX size={16} className="text-rose-600 flex-shrink-0" />
-          <p className="text-rose-700 text-sm">No se pudo registrar. Verifica que el UID sea correcto y que tengas permisos de Administrador.</p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">UID de Firebase</label>
-          <input value={uid} onChange={e => setUid(e.target.value)}
-            placeholder="Ej: abc123xyz..." className={f} required disabled={saving || result === 'ok'} />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Email</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="usuario@empresa.com" className={f} required disabled={saving || result === 'ok'} />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Rol</label>
-          <select value={role} onChange={e => setRole(e.target.value)} className={f} disabled={saving || result === 'ok'}>
+    <Modal isOpen={isOpen} onClose={onClose} title="Registrar usuario" size="sm">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <Field label="UID de Firebase" required error={errors.uid}
+          hint="Está en Firebase Console → Authentication → Users.">
+          <input value={uid} onChange={e => { setUid(e.target.value); setErrors(p => ({ ...p, uid: '' })); }}
+            placeholder="Ej: abc123xyz…" autoFocus autoComplete="off" aria-required="true"
+            aria-invalid={!!errors.uid} className={fieldClass} />
+        </Field>
+        <Field label="Correo" required error={errors.email}>
+          <input type="email" value={email} onChange={e => { setEmail(e.target.value); setErrors(p => ({ ...p, email: '' })); }}
+            placeholder="usuario@empresa.com" autoComplete="off" aria-required="true"
+            aria-invalid={!!errors.email} className={fieldClass} />
+        </Field>
+        <Field label="Rol">
+          <select value={role} onChange={e => setRole(e.target.value)} className={fieldClass}>
             {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" type="button" onClick={handleClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" type="submit" disabled={saving || result === 'ok'}
-            className="flex items-center gap-2">
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? 'Registrando…' : 'Registrar'}
+        </Field>
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" type="submit" disabled={busy} className="flex items-center gap-2">
+            {busy && <Spinner size="sm" tone="dark" />}
+            {busy ? 'Registrando…' : 'Registrar'}
           </Button>
-        </div>
+        </FormActions>
       </form>
     </Modal>
   );
@@ -108,6 +87,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
   const [pageError,  setPageError]  = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [historyUser, setHistoryUser] = useState(null);
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => {
     if (!db) return;
@@ -136,6 +116,8 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
   const addUser = async ({ uid, email, role }) => {
     const entry = { timestamp: Timestamp.now(), user: currentUser.email, action: 'Usuario registrado en el sistema.' };
     await setDoc(doc(db, 'users', uid), { email, role, active: true, history: [entry] });
+    setShowAddModal(false);
+    showToast(`${email} registrado`);
   };
 
   const isLastActiveAdmin = (user) =>
@@ -175,23 +157,23 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
               <ArrowLeft size={18} />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-brand-ink">Gestión de Usuarios</h1>
+              <h1 className="text-xl font-bold text-brand-ink">Gestión de usuarios</h1>
               <p className="text-xs text-brand-gray mt-0.5">Solo los usuarios registrados aquí pueden acceder al sistema</p>
             </div>
           </div>
           <button onClick={() => setShowAddModal(true)} aria-label="Registrar usuario"
-            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
+            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-brand-ink text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
             <UserPlus size={15} />
-            <span className="hidden sm:inline">Registrar Usuario</span>
+            <span className="hidden sm:inline">Registrar usuario</span>
           </button>
         </header>
 
         {/* Error de acción */}
         {pageError && (
-          <div className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 animate-reveal">
+          <div role="alert" className="mb-6 bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 animate-reveal">
             <AlertTriangle size={18} className="text-rose-500 flex-shrink-0 mt-0.5" />
             <p className="text-rose-700 text-sm flex-1">{pageError}</p>
-            <button onClick={() => setPageError('')} className="text-rose-400 hover:text-rose-600 p-0.5">
+            <button onClick={() => setPageError('')} aria-label="Cerrar aviso" className="text-rose-500 hover:text-rose-700 p-0.5">
               <X size={16} />
             </button>
           </div>
@@ -199,7 +181,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
 
         {/* Aviso de seguridad */}
         <div className="bg-brand-orange/8 border border-brand-orange/20 rounded-2xl p-4 mb-6 flex items-start gap-3">
-          <Shield size={18} className="text-brand-orange flex-shrink-0 mt-0.5" />
+          <Shield size={18} className="text-brand-ember flex-shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold text-brand-ink">Acceso controlado</p>
             <p className="text-brand-slate mt-0.5">
@@ -209,7 +191,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
         </div>
 
         {/* Lista */}
-        <div className="bg-white border border-brand-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-brand-border rounded-2xl shadow-card overflow-hidden">
           <div className="hidden sm:grid grid-cols-[1fr_160px_120px_100px] gap-4 px-6 py-3 border-b border-brand-border bg-brand-bg/50">
             <p className="text-xs font-semibold text-brand-gray uppercase tracking-wider">Usuario</p>
             <p className="text-xs font-semibold text-brand-gray uppercase tracking-wider">Rol</p>
@@ -219,7 +201,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
 
           {loading ? (
             <div className="flex flex-col items-center gap-3 py-16 text-brand-gray">
-              <Loader2 size={24} className="animate-spin text-brand-orange" />
+              <Loader2 size={24} className="animate-spin text-brand-ember" />
               <span className="text-sm">Cargando usuarios…</span>
             </div>
           ) : users.length === 0 ? (
@@ -241,7 +223,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-semibold text-brand-ink text-sm truncate">{user.email}</p>
-                          {isSelf && <span className="text-xs text-brand-orange">← Tú</span>}
+                          {isSelf && <span className="text-xs text-brand-ember">← Tú</span>}
                         </div>
                         <RoleBadge role={user.role ?? 'Lector'} />
                       </div>
@@ -272,7 +254,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                     <div className="hidden sm:grid grid-cols-[1fr_160px_120px_100px] gap-4 items-center">
                       <div className="min-w-0">
                         <p className="font-semibold text-brand-ink text-sm truncate">{user.email}</p>
-                        {isSelf && <span className="text-xs text-brand-orange">← Tu cuenta</span>}
+                        {isSelf && <span className="text-xs text-brand-ember">← Tu cuenta</span>}
                       </div>
                       <RoleBadge role={user.role ?? 'Lector'} />
                       <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isActive ? 'text-emerald-600' : 'text-brand-gray'}`}>
@@ -293,7 +275,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                           <button onClick={() => toggleRole(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : `Cambiar a ${user.role === 'Administrador' ? 'Lector' : 'Administrador'}`}
                             aria-label={`Cambiar rol de ${user.email}`}
-                            className="p-2 rounded-lg text-brand-slate hover:text-brand-orange hover:bg-brand-orange/10 transition disabled:opacity-40">
+                            className="p-2 rounded-lg text-brand-slate hover:text-brand-ember hover:bg-brand-orange/10 transition disabled:opacity-40">
                             {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Shield size={15} />}
                           </button>
                           <button onClick={() => toggleActive(user)} disabled={isSaving || isLastAdmin}
@@ -316,6 +298,8 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
           Un usuario inactivo no puede entrar aunque su clave sea válida.
         </p>
       </div>
+
+      <ToastHost toast={toast} onDismiss={dismissToast} />
 
       <HistoryModal isOpen={!!historyUser} onClose={() => setHistoryUser(null)}
         item={historyUser ? { nombre: historyUser.email, history: historyUser.history } : null} />

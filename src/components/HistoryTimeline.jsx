@@ -31,7 +31,7 @@ const HistoryTimeline = ({ history }) => {
             </ul>
           )}
           <p className="text-xs text-brand-gray mt-2 text-right">
-            {formatFechaHora(entry.timestamp?.toDate())} · <span className="text-brand-orange font-medium">{entry.user}</span>
+            {formatFechaHora(entry.timestamp?.toDate())} · <span className="text-brand-ember font-medium">{entry.user}</span>
           </p>
         </div>
       ))}

@@ -4,13 +4,18 @@
 
 /* Los colores de marca viven en tailwind.config.js (theme.extend.colors.brand) — única fuente de verdad. */
 
-/* Inter (Google Fonts) como fuente principal: fonts.cdnfonts.com (Greycliff CF) no es confiable
-   y sus caídas cambiaban el ancho del texto entre visitas, descuadrando tablas y layouts. */
+/* IBM Plex Sans como fuente principal, servida desde el propio sitio (main.jsx): las fuentes de CDN
+   externo (cdnfonts, y antes Google) cambiaban el ancho del texto entre visitas y descuadraban tablas. */
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply font-sans bg-brand-bg text-brand-ink;
   -webkit-font-smoothing: antialiased;
-  @apply bg-brand-bg text-brand-ink;
 }
+
+/* Cifras de ancho fijo en tablas (fechas, Nº, totales alinean en columna) */
+td, th { font-variant-numeric: tabular-nums; }
+
+/* Párrafos: sin una palabra suelta en la última línea */
+p { text-wrap: pretty; }
 
 @layer utilities {
   /* Entradas: desde 0.96, nunca desde 0. `backwards` evita dejar un transform residual al terminar */
@@ -67,6 +72,10 @@ body {
 .modal-panel {
   animation: fadeInScale 0.2s cubic-bezier(0.23, 1, 0.32, 1) backwards;
 }
+/* Con barra de acciones fija, el panel no deja relleno debajo: la barra ocupa el borde inferior */
+.modal-panel:has([data-form-actions]) {
+  padding-bottom: 0;
+}
 .modal-overlay[data-state="closed"] .modal-panel {
   animation: fadeOutScale 0.15s ease-out forwards;
 }
@@ -86,9 +95,20 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Esqueleto de carga: solo opacidad (barato y sin saltos de layout) */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.skeleton {
+  background: #E3E7EB;
+  border-radius: 0.5rem;
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
 /* Foco visible con el color de marca (solo teclado) */
 button:focus-visible, a:focus-visible, [tabindex]:not([tabindex="-1"]):focus-visible {
-  outline: 2px solid #E68E00;
+  outline: 2px solid #B86E00;
   outline-offset: 2px;
 }
 
@@ -99,6 +119,12 @@ button:not(:disabled):not(.w-full):not([class*="translate"]):active {
 }
 
 h1, h2, h3 { text-wrap: balance; }
+
+/* Casillas y botones de opción con el color de marca (en vez del azul del navegador) */
+input[type="checkbox"], input[type="radio"] { accent-color: #E68E00; }
+
+/* Campos de fecha: el selector nativo respeta el tamaño de texto del campo */
+input[type="date"] { min-height: 2.75rem; }
 
 /* Resplandor de fondo: degradado estático en vez de un blur de 120px (mismo aspecto, sin costo de pintura) */
 .bg-glow {

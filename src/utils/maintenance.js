@@ -86,3 +86,17 @@ export function countOverdueMaintenance(items, now = new Date()) {
     return info?.urgencia === 'vencido' ? count + 1 : count;
   }, 0);
 }
+
+// Resumen de vencidos para el dashboard: cuántos son y cuántos días lleva el peor.
+export function summarizeOverdue(items, now = new Date()) {
+  let vencidos = 0;
+  let masAntiguoDias = 0;
+  items.forEach(item => {
+    const info = getMaintenanceInfo(item, now);
+    if (info?.urgencia === 'vencido') {
+      vencidos++;
+      masAntiguoDias = Math.max(masAntiguoDias, -info.diasRestantes);
+    }
+  });
+  return { vencidos, masAntiguoDias };
+}

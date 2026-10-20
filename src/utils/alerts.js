@@ -4,7 +4,13 @@ const STALE_DAYS_THRESHOLD  = 30;
 const MANY_OOS_THRESHOLD    = 3;
 
 // ── ¿Hace cuántos días está el equipo en su estado actual? ──
+// `estadoDesde` (se guarda al cambiar de estado) manda; el historial embebido
+// de equipos antiguos y la fecha de creación quedan como respaldo para los
+// equipos que aún no cambian de estado desde que existe ese campo.
 function daysInCurrentState(item) {
+  if (item.estadoDesde?.toDate) {
+    return Math.floor((Date.now() - item.estadoDesde.toDate().getTime()) / 86_400_000);
+  }
   const history = item.history ?? [];
   const relevant = history
     .filter(h => h.changes?.some(c => c.field === 'estado' && c.to === item.estado))

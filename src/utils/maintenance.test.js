@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance, getUpcomingMaintenance } from './maintenance';
+import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance, getUpcomingMaintenance, summarizeOverdue } from './maintenance';
 
 const ts = (date) => ({ toDate: () => date });
 const daysAgo = (n) => ts(new Date(Date.now() - n * 86_400_000));
@@ -147,5 +147,29 @@ describe('getMaintenanceInfo — días de calendario', () => {
     const now = new Date(2026, 9, 10, 9, 0);
     const item = venceHoy(new Date(2026, 9, 9));
     expect(getMaintenanceInfo(item, now).diasRestantes).toBe(-1);
+  });
+});
+
+describe('summarizeOverdue', () => {
+  // Último mantenimiento hace 6 meses + `dias` días: vencido hace `dias` días (frecuencia por defecto: 6 meses).
+  const conVencimiento = (now, dias) => {
+    const base = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate() - dias, 12, 0, 0);
+    return { categoria: 'Laptops', estado: 'En Uso', ultimoMantenimiento: ts(base) };
+  };
+  const hoy = new Date(2026, 9, 20, 10, 0);
+
+  it('cuenta los vencidos y da los días del más antiguo', () => {
+    const items = [conVencimiento(hoy, 12), conVencimiento(hoy, 562), conVencimiento(hoy, 3), conVencimiento(hoy, -40)];
+    const dias = items.map(i => getMaintenanceInfo(i, hoy).diasRestantes);
+    const res = summarizeOverdue(items, hoy);
+    expect(res.vencidos).toBe(3);
+    expect(res.masAntiguoDias).toBe(-Math.min(...dias));       // el peor = el de menor días restantes
+    expect(res.masAntiguoDias).toBeGreaterThan(555);           // ≈ 562 (los meses no miden igual)
+    expect(res.masAntiguoDias).toBeLessThan(570);
+  });
+
+  it('sin vencidos devuelve ceros', () => {
+    expect(summarizeOverdue([conVencimiento(hoy, -10)], hoy)).toEqual({ vencidos: 0, masAntiguoDias: 0 });
+    expect(summarizeOverdue([], hoy)).toEqual({ vencidos: 0, masAntiguoDias: 0 });
   });
 });

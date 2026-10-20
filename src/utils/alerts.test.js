@@ -91,3 +91,27 @@ describe('computeAlerts', () => {
     expect(computeAlerts(items)).toEqual([]);
   });
 });
+
+describe('computeAlerts — estancados con estadoDesde', () => {
+  it('usa estadoDesde: un equipo creado hace mucho pero cambiado ayer no está estancado', () => {
+    const items = [makeItem({ estado: 'En Mantenimiento', createdAt: daysAgo(400), estadoDesde: daysAgo(1) })];
+    expect(computeAlerts(items)).toEqual([]);
+  });
+
+  it('usa estadoDesde: más de 30 días en el estado actual sí avisa', () => {
+    const items = [makeItem({ estado: 'Fuera de Servicio', createdAt: daysAgo(400), estadoDesde: daysAgo(45) })];
+    const alerts = computeAlerts(items);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].id).toBe('stale-items');
+  });
+
+  it('estadoDesde manda sobre el historial embebido antiguo', () => {
+    const items = [makeItem({
+      estado: 'En Mantenimiento',
+      createdAt: daysAgo(400),
+      estadoDesde: daysAgo(3),
+      history: [{ timestamp: daysAgo(200), changes: [{ field: 'estado', from: 'Disponible', to: 'En Mantenimiento' }] }],
+    })];
+    expect(computeAlerts(items)).toEqual([]);
+  });
+});

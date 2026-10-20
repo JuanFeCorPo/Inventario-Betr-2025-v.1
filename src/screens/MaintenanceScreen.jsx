@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, Loader2, Laptop, Cpu } from 'lucide-react';
-import { Modal, Button, EmptyState } from '../components/ui';
-import { formatFecha } from '../utils/format';
+import { Modal, Button, EmptyState, Field, FormActions, Spinner, ToastHost } from '../components/ui';
+import { formatFecha, hoyLocal } from '../utils/format';
 import { fieldClass } from '../components/ui/fieldClasses';
 import useInventory from '../hooks/useInventory';
+import useAsyncAction from '../hooks/useAsyncAction';
+import useToast from '../hooks/useToast';
 import { groupMaintenanceByUrgency, GRUPOS_URGENCIA } from '../utils/maintenance';
 
 const URGENCIA_STYLES = {
@@ -29,41 +31,43 @@ const diasLargo = (dias) => {
 const RegisterMaintenanceModal = ({ isOpen, onClose, onConfirm, itemName }) => {
   const [fecha, setFecha] = useState('');
   const [notas, setNotas] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [fechaError, setFechaError] = useState('');
+  const { busy, error, run, reset } = useAsyncAction();
 
   useEffect(() => {
-    if (isOpen) { setFecha(new Date().toISOString().split('T')[0]); setNotas(''); setSaving(false); }
-  }, [isOpen]);
+    if (isOpen) { setFecha(hoyLocal()); setNotas(''); setFechaError(''); reset(); }
+  }, [isOpen, reset]);
 
-  const handleConfirm = async () => {
-    if (!fecha) return;
-    setSaving(true);
-    await onConfirm(fecha, notas);
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!fecha) { setFechaError('Elige la fecha del mantenimiento.'); return; }
+    if (fecha > hoyLocal()) { setFechaError('La fecha no puede ser futura.'); return; }
+    setFechaError('');
+    run(() => onConfirm(fecha, notas), 'No se pudo registrar el mantenimiento. Revisa tu conexión e inténtalo de nuevo.');
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrar Mantenimiento" size="sm">
-      <div className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="Registrar mantenimiento" size="sm">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <p className="text-brand-slate text-sm">
           Equipo: <span className="font-semibold text-brand-ink">{itemName}</span>
         </p>
-        <div>
-          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Fecha del mantenimiento</label>
-          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={fieldClass} />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-brand-slate mb-1.5 block">Notas (opcional)</label>
+        <Field label="Fecha del mantenimiento" required error={fechaError}>
+          <input type="date" value={fecha} max={hoyLocal()} onChange={e => { setFecha(e.target.value); setFechaError(''); }}
+            autoFocus aria-required="true" aria-invalid={!!fechaError} className={fieldClass} />
+        </Field>
+        <Field label="Notas (opcional)">
           <textarea value={notas} onChange={e => setNotas(e.target.value)}
-            placeholder="Ej: Limpieza interna, cambio de pasta térmica…" className={`${fieldClass} h-24 resize-none`} />
-        </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button variant="primary" onClick={handleConfirm} disabled={saving || !fecha} className="flex items-center gap-2">
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            {saving ? 'Guardando…' : 'Registrar'}
+            placeholder="Ej: limpieza interna, cambio de pasta térmica…" className={`${fieldClass} h-24 resize-none`} />
+        </Field>
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="primary" type="submit" disabled={busy} className="flex items-center gap-2">
+            {busy && <Spinner size="sm" tone="dark" />}
+            {busy ? 'Guardando…' : 'Registrar'}
           </Button>
-        </div>
-      </div>
+        </FormActions>
+      </form>
     </Modal>
   );
 };
@@ -74,7 +78,7 @@ const UrgencyColumn = ({ group, isAdmin, onRegister }) => {
   const style = URGENCIA_STYLES[group.key];
   const { rows } = group;
   return (
-    <section className="bg-white border border-brand-border rounded-2xl shadow-sm overflow-hidden">
+    <section className="bg-white border border-brand-border rounded-2xl shadow-card overflow-hidden">
       <header className="px-4 pt-3 pb-2.5 border-b border-brand-border">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${style.dot}`} />
@@ -119,6 +123,7 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
   const isAdmin = user.role === 'Administrador';
   const { items, loading, registerMaintenance } = useInventory(db, user);
   const [target, setTarget] = useState(null);
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
 
   const groups = useMemo(() => {
     const found = groupMaintenanceByUrgency(items);
@@ -126,9 +131,12 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
   }, [items]);
   const totalRelevantes = useMemo(() => groups.reduce((n, g) => n + g.rows.length, 0), [groups]);
 
+  // Si falla, el error se propaga al modal (que lo muestra y deja reintentar).
   const handleConfirmRegister = async (fecha, notas) => {
+    const nombre = target.nombre;
     await registerMaintenance(target.id, fecha, notas);
     setTarget(null);
+    showToast(`Mantenimiento de ${nombre} registrado`);
   };
 
   return (
@@ -143,14 +151,14 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-brand-ink">Mantenimientos Preventivos</h1>
+            <h1 className="text-xl font-bold text-brand-ink">Mantenimientos preventivos</h1>
             <p className="text-xs text-brand-gray mt-0.5">Laptops y CPU, ordenados por urgencia</p>
           </div>
         </header>
 
         {loading ? (
           <div className="flex flex-col items-center gap-3 py-16 text-brand-gray">
-            <Loader2 size={24} className="animate-spin text-brand-orange" />
+            <Loader2 size={24} className="animate-spin text-brand-ember" />
             <span className="text-sm">Cargando equipos…</span>
           </div>
         ) : totalRelevantes === 0 ? (
@@ -167,6 +175,7 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
       </div>
 
       <RegisterMaintenanceModal isOpen={!!target} onClose={() => setTarget(null)} onConfirm={handleConfirmRegister} itemName={target?.nombre} />
+      <ToastHost toast={toast} onDismiss={dismissToast} />
     </div>
   );
 };

@@ -1,34 +1,56 @@
 import { useState, useEffect } from 'react';
 import { Archive, AlertTriangle } from 'lucide-react';
-import { Modal, Button, StatusBadge } from '../ui';
+import { Modal, Button, StatusBadge, Spinner, Field, FormActions } from '../ui';
 import { fieldClass } from '../ui/fieldClasses';
 import HistoryTimeline from '../HistoryTimeline';
+import useAsyncAction from '../../hooks/useAsyncAction';
+import { hoyLocal } from '../../utils/format';
 
+// Los formularios de este archivo siguen una sola anatomía: <form> (Enter envía),
+// campos con etiqueta, validación propia con mensaje junto al campo, acción
+// bloqueada mientras trabaja y el error de la acción visible dentro del modal.
 
 export const DeactivateModal = ({ isOpen, onClose, onDeactivate }) => {
   const [reason, setReason] = useState('');
   const [fecha, setFecha]   = useState('');
-  const [error, setError]   = useState('');
-  useEffect(() => { if (isOpen) { setReason(''); setFecha(new Date().toISOString().split('T')[0]); setError(''); } }, [isOpen]);
-  const handleConfirm = () => {
-    if (!reason.trim() || !fecha) { setError('Completa el motivo y la fecha.'); return; }
-    onDeactivate(reason, fecha);
+  const [errors, setErrors] = useState({});
+  const { busy, error, run, reset } = useAsyncAction();
+
+  useEffect(() => {
+    if (isOpen) { setReason(''); setFecha(hoyLocal()); setErrors({}); reset(); }
+  }, [isOpen, reset]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const next = {};
+    if (!reason.trim()) next.reason = 'Escribe el motivo de la baja.';
+    if (!fecha) next.fecha = 'Elige la fecha de la baja.';
+    else if (fecha > hoyLocal()) next.fecha = 'La fecha no puede ser futura.';
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    run(() => onDeactivate(reason.trim(), fecha), 'No se pudo dar de baja el equipo. Revisa tu conexión e inténtalo de nuevo.');
   };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Dar de Baja Equipo" size="sm">
-      <div className="space-y-4">
-        <p className="text-brand-slate text-sm">Especifica el motivo y la fecha de baja.</p>
-        <textarea value={reason} onChange={e => setReason(e.target.value)}
-          placeholder="Ej: Pantalla rota, equipo obsoleto…" className={`${fieldClass} h-28 resize-none`} />
-        <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={fieldClass} />
-        {error && (
-          <p className="text-rose-600 text-xs text-center bg-rose-50 border border-rose-200 rounded-lg py-2 px-3 animate-reveal">{error}</p>
-        )}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button variant="warning" onClick={handleConfirm}>Confirmar Baja</Button>
-        </div>
-      </div>
+    <Modal isOpen={isOpen} onClose={onClose} title="Dar de baja equipo" size="sm">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <Field label="Motivo de la baja" required error={errors.reason}>
+          <textarea value={reason} onChange={e => { setReason(e.target.value); setErrors(p => ({ ...p, reason: '' })); }}
+            placeholder="Ej: pantalla rota, equipo obsoleto…" autoFocus aria-required="true"
+            aria-invalid={!!errors.reason} className={`${fieldClass} h-28 resize-none`} />
+        </Field>
+        <Field label="Fecha de la baja" required error={errors.fecha}>
+          <input type="date" value={fecha} max={hoyLocal()} onChange={e => { setFecha(e.target.value); setErrors(p => ({ ...p, fecha: '' })); }}
+            aria-required="true" aria-invalid={!!errors.fecha} className={fieldClass} />
+        </Field>
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="warning" type="submit" disabled={busy} className="flex items-center gap-2">
+            {busy && <Spinner size="sm" tone="dark" />}
+            {busy ? 'Guardando…' : 'Confirmar baja'}
+          </Button>
+        </FormActions>
+      </form>
     </Modal>
   );
 };
@@ -69,15 +91,15 @@ export const DuplicateWarningModal = ({ isOpen, onClose, onConfirm, conflicts = 
             <Archive size={15} className="text-brand-gray flex-shrink-0 mt-0.5" />
             <p className="text-xs text-brand-slate">
               Ese equipo está <span className="font-semibold text-brand-ink">dado de baja</span>, por eso no
-              aparece al buscarlo con el filtro en “Activos”. Cambia el filtro a “Todos” para encontrarlo y corregirlo.
+              aparece al buscarlo con el filtro en “Activos”. Cambia el estado a “Todos” para encontrarlo y corregirlo.
             </p>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-2">
+        <FormActions>
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button variant="warning" onClick={onConfirm}>Guardar de todos modos</Button>
-        </div>
+        </FormActions>
       </div>
     </Modal>
   );
@@ -93,23 +115,46 @@ export const HistoryModal = ({ isOpen, onClose, item }) => (
 
 export const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, itemName }) => {
   const [confirmText, setConfirmText] = useState('');
-  useEffect(() => { if (isOpen) setConfirmText(''); }, [isOpen]);
+  const { busy, error, run, reset } = useAsyncAction();
+
+  useEffect(() => { if (isOpen) { setConfirmText(''); reset(); } }, [isOpen, reset]);
   const matches = confirmText.trim().toLowerCase() === (itemName ?? '').trim().toLowerCase();
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!matches) return;
+    run(() => onConfirm(), 'No se pudo eliminar el equipo. Revisa tu conexión e inténtalo de nuevo.');
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Eliminar equipo" size="sm">
-      <div className="space-y-4">
-        <p className="text-rose-500 font-medium">Esta acción es irreversible.</p>
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <p className="text-brand-slate text-sm">
-          Para confirmar, escribe el nombre exacto: <span className="font-bold text-brand-ink">{itemName}</span>
+          El equipo sale del inventario. Tendrás unos segundos para deshacerlo.
         </p>
-        <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
-          placeholder="Escribe el nombre del equipo" className={fieldClass} />
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button variant="danger" onClick={onConfirm} disabled={!matches}>Sí, Eliminar</Button>
-        </div>
-      </div>
+        <Field label={`Escribe «${itemName ?? ''}» para confirmar`}>
+          <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
+            placeholder="Nombre del equipo" autoFocus autoComplete="off" className={fieldClass} />
+        </Field>
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="danger" type="submit" disabled={!matches || busy} className="flex items-center gap-2">
+            {busy && <Spinner size="sm" tone="light" />}
+            {busy ? 'Eliminando…' : 'Sí, eliminar'}
+          </Button>
+        </FormActions>
+      </form>
     </Modal>
   );
 };
+
+// ── Confirmar descartar un formulario con cambios sin guardar ──
+export const DiscardChangesModal = ({ isOpen, onClose, onConfirm }) => (
+  <Modal isOpen={isOpen} onClose={onClose} title="¿Descartar los cambios?" size="sm">
+    <p className="text-brand-slate text-sm">Lo que escribiste en este formulario no se ha guardado.</p>
+    <FormActions>
+      <Button variant="secondary" onClick={onClose}>Seguir editando</Button>
+      <Button variant="danger" onClick={onConfirm}>Descartar</Button>
+    </FormActions>
+  </Modal>
+);
