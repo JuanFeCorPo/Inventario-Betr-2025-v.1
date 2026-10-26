@@ -25,6 +25,7 @@ export default function App() {
   const [hasError, setHasError] = useState(!!configError);
   const [screen,   setScreen]   = useState('dashboard');
   const [authError, setAuthError] = useState('');
+  const [authNotice, setAuthNotice] = useState('');
 
   useEffect(() => {
     if (!firebaseConfig) { setHasError(true); setLoading(false); return; }
@@ -78,6 +79,7 @@ export default function App() {
   const handleLogin = async (email, password) => {
     if (!auth) throw new Error('Firebase auth no está listo.');
     setAuthError('');
+    setAuthNotice('');
 
     // El bloqueo se revisa en Firestore (no solo en este navegador) antes
     // de intentar el login, para que no se pueda evadir borrando el caché.
@@ -101,11 +103,17 @@ export default function App() {
 
   const handleLogout = () => { setScreen('dashboard'); signOut(auth); };
 
+  // Al cerrar por inactividad, el login explica por qué (antes la pantalla cambiaba sin decir nada)
+  const handleIdleLogout = () => {
+    setAuthNotice('Tu sesión se cerró por inactividad. Inicia sesión de nuevo para continuar.');
+    handleLogout();
+  };
+
   // El control de inactividad vive aquí y no en el dashboard: antes, al entrar
   // a Usuarios o Mantenimientos el temporizador se desmontaba con la pantalla
   // y el aviso no salía. Aquí aplica a todas por igual.
   const { expired: sessionExpired, countdown: idleCountdown } =
-    useIdleTimeout(handleLogout, user, IDLE_TIME_MS, IDLE_WARNING_MS);
+    useIdleTimeout(handleIdleLogout, user, IDLE_TIME_MS, IDLE_WARNING_MS);
 
   if (loading) {
     return (
@@ -116,7 +124,7 @@ export default function App() {
   }
 
   if (hasError) return <ConfigErrorScreen />;
-  if (!user)    return <LoginScreen onLogin={handleLogin} onResetPassword={handleResetPassword} accessError={authError} />;
+  if (!user)    return <LoginScreen onLogin={handleLogin} onResetPassword={handleResetPassword} accessError={authError} notice={authNotice} />;
 
   const screenEl = (screen === 'users' && user.role === 'Administrador')
     ? <UsersScreen db={db} currentUser={user} onBack={() => setScreen('dashboard')} />

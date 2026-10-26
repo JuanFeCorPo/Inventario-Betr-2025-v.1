@@ -8,7 +8,8 @@ export default {
       colors: {
         brand: {
           orange:  '#E68E00',
-          ember:   '#9A5700',   // naranja para TEXTO (5,6:1 sobre blanco); el naranja de marca va en fondos con texto de tinta
+          cocoa:   '#3B2200',   // texto sobre fondos naranja/ámbar (5,8:1): mismo tono que el fondo, no negro
+          ember:   '#9A5700',   // naranja para TEXTO (5,6:1 sobre blanco); el naranja de marca va en fondos con texto cocoa
           amber:   '#EDAA00',
           yellow:  '#F4DB44',
           slate:   '#5E6A74',

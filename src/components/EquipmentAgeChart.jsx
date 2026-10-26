@@ -2,21 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { getAgeBuckets } from '../utils/equipmentAge';
 import { Skeleton } from './ui';
+import useWasLoading from '../hooks/useWasLoading';
+
+// Las barras crecen solo la primera vez que se ven en la sesión: volver al dashboard no debe repetirlo
+let yaAnimada = false;
 
 // ── Distribución de equipos activos por antigüedad (fechaIngreso) ──
 // Reemplaza la dona por categoría: esa información ya vivía en el filtro
 // de categoría, mientras que la antigüedad no se veía en ningún lado y
 // ayuda a planear renovación/presupuesto.
 const EquipmentAgeChart = ({ items, loading = false }) => {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(yaAnimada);
+  const venciaCarga = useWasLoading(loading);
   const { buckets, total } = useMemo(() => getAgeBuckets(items), [items]);
   const max = useMemo(() => Math.max(...buckets.map(b => b.count), 1), [buckets]);
   // El dato clave en una frase: qué parte del parque cae en el tramo más grande
   const dominante = useMemo(() => buckets.reduce((a, b) => (b.count > (a?.count ?? 0) ? b : a), null), [buckets]);
 
   useEffect(() => {
+    if (yaAnimada) { setMounted(true); return undefined; }
     setMounted(false);
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)));
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      setMounted(true);
+      if (buckets.length > 0) yaAnimada = true;
+    }));
     return () => cancelAnimationFrame(id);
   }, [buckets.length]);
 
@@ -40,7 +49,7 @@ const EquipmentAgeChart = ({ items, loading = false }) => {
       ) : total === 0 ? (
         <p className="text-center text-sm text-brand-gray italic py-6">Sin equipos activos para mostrar.</p>
       ) : (
-        <>
+        <div className={venciaCarga ? 'animate-content-in' : ''}>
           <p className="text-xs text-brand-gray mb-4">
             {total} equipo{total !== 1 ? 's' : ''} activo{total !== 1 ? 's' : ''}
             {dominante && <> · el <span className="font-semibold text-brand-slate">{Math.round((dominante.count / total) * 100)} %</span> {dominante.frase}</>}
@@ -66,7 +75,7 @@ const EquipmentAgeChart = ({ items, loading = false }) => {
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -45,6 +45,15 @@ p { text-wrap: pretty; }
   .animate-reveal {
     animation: reveal 0.18s cubic-bezier(0.23, 1, 0.32, 1) backwards;
   }
+  /* Contenido que reemplaza a un esqueleto: fundido corto, sin movimiento */
+  .animate-content-in {
+    animation: overlayIn 0.15s ease-out backwards;
+  }
+  /* Salida del aviso inferior: más corta que la entrada */
+  .animate-toast-out {
+    animation: toastOut 0.12s ease-out forwards;
+    pointer-events: none;
+  }
   /* Solo opacidad: para elementos que aparecen mientras se escribe */
   .animate-fade-in {
     animation: overlayIn 0.1s ease-out backwards;
@@ -89,6 +98,10 @@ p { text-wrap: pretty; }
   to   { opacity: 0; transform: scale(0.97); }
 }
 @keyframes overlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(4px); }
+}
 @keyframes overlayOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes reveal {
   from { opacity: 0; transform: translateY(-4px); }
@@ -114,11 +127,28 @@ button:focus-visible, a:focus-visible, [tabindex]:not([tabindex="-1"]):focus-vis
 
 /* Feedback al presionar: botones compactos se hunden un poco.
    Los de ancho completo (filas de lista) no, se verían raros; los que ya usan translate tampoco (perderían su posición). */
-button:not(:disabled):not(.w-full):not([class*="translate"]):active {
+button:not(:disabled):not(.w-full):not(.press-soft):not([class*="translate"]):active {
   transform: scale(0.97);
+}
+/* Tarjetas grandes: hundirse proporcional a su tamaño (97 % en una tarjeta de 240 px se siente brusco) */
+button.press-soft:not(:disabled):active {
+  transform: scale(0.985);
 }
 
 h1, h2, h3 { text-wrap: balance; }
+
+/* Selección de texto y cursor con el color de marca */
+::selection { background: rgba(230, 142, 0, 0.25); }
+input, textarea { caret-color: #B86E00; }
+
+/* Autocompletar del navegador: sin el fondo amarillo/azul que rompe el campo */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #F0F2F4 inset;
+  -webkit-text-fill-color: #1C2B35;
+  caret-color: #B86E00;
+}
 
 /* Casillas y botones de opción con el color de marca (en vez del azul del navegador) */
 input[type="checkbox"], input[type="radio"] { accent-color: #E68E00; }
@@ -143,7 +173,8 @@ input[type="date"] { min-height: 2.75rem; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  button:not(:disabled):not(.w-full):not([class*="translate"]):active { transform: none; }
+  button:not(:disabled):not(.w-full):not(.press-soft):not([class*="translate"]):active { transform: none; }
+  button.press-soft:not(:disabled):active { transform: none; }
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }

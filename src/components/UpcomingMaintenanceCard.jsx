@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Wrench, ChevronRight } from 'lucide-react';
 import { getUpcomingMaintenance, summarizeOverdue } from '../utils/maintenance';
 import { Skeleton } from './ui';
+import useWasLoading from '../hooks/useWasLoading';
 
 const URGENCIA_DOT = {
   'vencido':     'bg-rose-500',
@@ -22,6 +23,7 @@ const formatDiasRestantes = (dias) => {
 const UpcomingMaintenanceCard = ({ items, onNavigate, loading = false }) => {
   const upcoming = useMemo(() => getUpcomingMaintenance(items, 4), [items]);
   const { vencidos, masAntiguoDias } = useMemo(() => summarizeOverdue(items), [items]);
+  const venciaCarga = useWasLoading(loading);
 
   return (
     <div className="bg-white border border-brand-border rounded-2xl p-4 sm:p-5 shadow-card">
@@ -41,7 +43,7 @@ const UpcomingMaintenanceCard = ({ items, onNavigate, loading = false }) => {
           <Skeleton className="h-[68px] w-full rounded-xl" />
           {[0, 1, 2].map(i => <Skeleton key={i} className="h-3 w-full" />)}
         </div>
-      ) : (<>
+      ) : (<div className={venciaCarga ? 'animate-content-in' : ''}>
       {vencidos > 0 && (
         <button type="button" onClick={() => onNavigate('maintenance')}
           className="w-full text-left flex items-baseline gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-3 mb-3 hover:bg-rose-100/70 transition-colors">
@@ -66,7 +68,7 @@ const UpcomingMaintenanceCard = ({ items, onNavigate, loading = false }) => {
           ))}
         </ul>
       )}
-      </>)}
+      </div>)}
     </div>
   );
 };

@@ -51,7 +51,7 @@ export const STATUS_DOT = {
 };
 export const STATUS_ORDER = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio', 'De Baja'];
 
-export const LOGO_URL      = 'https://i.postimg.cc/L6hypBbp/128x128.png';
-export const LOGO_FALLBACK = 'https://placehold.co/128x128/5E6A74/FFFFFF?text=B';
+// Logo propio (public/): antes se descargaba de un sitio externo en cada visita y el login dependía de él
+export const LOGO_URL = '/logo-betrmedia.png';
 export const IDLE_TIME_MS    = 900_000;   // 15 minutos
 export const IDLE_WARNING_MS = 40_000;    // aviso 40 s antes del cierre

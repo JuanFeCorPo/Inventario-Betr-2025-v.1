@@ -8,11 +8,12 @@ import { X, ChevronDown, Sparkles } from 'lucide-react';
 import { ESTADO_STYLES, STATUS_DOT } from '../../config/constants';
 import { usePresence, useEscape, usePopover, useScrollLock } from '../../hooks/usePopover';
 import { fieldClass } from './fieldClasses';
+import useWasLoading from '../../hooks/useWasLoading';
 
 // ── Spinner de carga ─────────────────────────
 export const Spinner = ({ size = 'md', tone = 'brand' }) => {
   const sizes = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' };
-  const tones = { brand: 'border-brand-orange/30 border-t-brand-orange', light: 'border-white/30 border-t-white', dark: 'border-brand-ink/25 border-t-brand-ink' };
+  const tones = { brand: 'border-brand-orange/30 border-t-brand-orange', light: 'border-white/30 border-t-white', dark: 'border-brand-cocoa/25 border-t-brand-cocoa' };
   return <span role="status" aria-label="Cargando" className={`inline-block border-2 rounded-full animate-spin ${sizes[size]} ${tones[tone]}`} />;
 };
 
@@ -157,21 +158,24 @@ export const NewBadge = () => (
 );
 
 // ── Tarjeta de estadística ───────────────────
-export const StatCard = ({ title, value, icon, accent, onClick, active = false, loading = false }) => (
-  <button onClick={onClick} title={title} aria-pressed={active} aria-busy={loading}
-    className={`group w-full text-left bg-white border p-3 sm:p-5 rounded-2xl flex items-center gap-3 sm:gap-4 shadow-card hover:shadow-card-hover transition duration-200 hover:border-brand-orange/40 focus:outline-none focus:ring-2 focus:ring-brand-orange/40
-      ${active ? 'border-brand-orange/70 ring-1 ring-brand-orange/30' : 'border-brand-border'}`}>
-    <div className={`p-3 rounded-xl ${accent} flex-shrink-0 transition-transform duration-200 group-hover:scale-105`}>
-      {icon}
-    </div>
-    <div className="min-w-0">
-      <p className="text-brand-gray text-xs font-medium truncate">{title}</p>
-      {loading
-        ? <Skeleton className="h-6 sm:h-7 w-12 mt-1" />
-        : <p className="text-brand-ink text-xl sm:text-2xl font-bold leading-none mt-0.5 tabular-nums">{value}</p>}
-    </div>
-  </button>
-);
+export const StatCard = ({ title, value, icon, accent, onClick, active = false, loading = false }) => {
+  const venciaCarga = useWasLoading(loading);
+  return (
+    <button onClick={onClick} title={title} aria-pressed={active} aria-busy={loading}
+      className={`press-soft group w-full text-left bg-white border p-3 sm:p-5 rounded-2xl flex items-center gap-3 sm:gap-4 shadow-card hover:shadow-card-hover transition duration-200 hover:border-brand-orange/40 focus:outline-none focus:ring-2 focus:ring-brand-orange/40
+        ${active ? 'border-brand-orange/70 ring-1 ring-brand-orange/30' : 'border-brand-border'}`}>
+      <div className={`p-3 rounded-xl ${accent} flex-shrink-0 transition-transform duration-200 group-hover:scale-105`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-brand-gray text-xs font-medium truncate">{title}</p>
+        {loading
+          ? <Skeleton className="h-6 sm:h-7 w-12 mt-1" />
+          : <p className={`text-brand-ink text-xl sm:text-2xl font-bold leading-none mt-0.5 tabular-nums ${venciaCarga ? 'animate-content-in' : ''}`}>{value}</p>}
+      </div>
+    </button>
+  );
+};
 
 // ── Input estilizado ─────────────────────────
 export const Input = ({ className = '', ...props }) => (
@@ -193,11 +197,12 @@ export const Textarea = ({ className = '', ...props }) => (
 // ── Botones ──────────────────────────────────
 export const Button = ({ variant = 'primary', size = 'md', className = '', children, ...props }) => {
   const variants = {
-    primary:   'bg-brand-orange hover:bg-brand-amber text-brand-ink font-semibold shadow-md hover:shadow-brand-orange/30',
+    primary:   'bg-brand-orange hover:bg-brand-amber text-brand-cocoa font-semibold shadow-md hover:shadow-brand-orange/30',
     secondary: 'bg-brand-bg hover:bg-brand-border text-brand-slate border border-brand-border',
+    outline:   'bg-white hover:bg-brand-bg text-brand-slate border border-brand-border shadow-sm',
     danger:    'bg-rose-600 hover:bg-rose-700 text-white font-semibold',
     dangerGhost: 'text-rose-600 hover:bg-rose-50 font-medium',
-    warning:   'bg-brand-amber hover:bg-brand-orange text-brand-ink font-semibold',
+    warning:   'bg-brand-amber hover:bg-brand-orange text-brand-cocoa font-semibold',
     ghost:     'text-brand-slate hover:text-brand-ink hover:bg-brand-bg',
   };
   const sizes = { md: 'px-5 py-2.5', sm: 'px-3 py-2 text-xs' };
@@ -248,17 +253,22 @@ export const Dropdown = ({ value, onChange, options, label: prefix }) => {
 };
 
 // ── Aviso de resultado con acción opcional (ver hooks/useToast) ──
+// Entra y sale con el mismo cuidado: al cerrarse conserva su contenido mientras se desvanece.
 export const ToastHost = ({ toast, onDismiss }) => {
-  if (!toast) return null;
+  const ultimo = useRef(toast);
+  if (toast) ultimo.current = toast;
+  const visible = usePresence(!!toast, 140);
+  const t = toast ?? ultimo.current;
+  if (!visible || !t) return null;
   return (
     <div className="fixed bottom-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
-      <div key={toast.id} role="status" aria-live="polite"
-        className="pointer-events-auto flex items-center gap-1 bg-brand-ink text-white text-sm pl-4 pr-1.5 py-1.5 rounded-xl shadow-xl animate-reveal max-w-full">
-        <span className="py-1.5 pr-2 min-w-0 truncate">{toast.message}</span>
-        {toast.action && (
-          <button type="button" onClick={() => { toast.action.onClick(); onDismiss(); }}
+      <div key={t.id} role="status" aria-live="polite"
+        className={`pointer-events-auto flex items-center gap-1 bg-brand-ink text-white text-sm pl-4 pr-1.5 py-1.5 rounded-xl shadow-xl max-w-full ${toast ? 'animate-reveal' : 'animate-toast-out'}`}>
+        <span className="py-1.5 pr-2 min-w-0 truncate">{t.message}</span>
+        {t.action && (
+          <button type="button" onClick={() => { t.action.onClick(); onDismiss(); }}
             className="text-brand-yellow font-semibold px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
-            {toast.action.label}
+            {t.action.label}
           </button>
         )}
         <button type="button" onClick={onDismiss} aria-label="Cerrar aviso"

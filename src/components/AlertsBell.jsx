@@ -16,7 +16,7 @@ const AlertsBell = ({ alerts, onGoTo, onDismiss }) => {
       <button type="button" onClick={() => setOpen(p => !p)} aria-label="Alertas del inventario" title="Alertas del inventario"
         className="relative w-10 h-10 flex items-center justify-center bg-white hover:bg-brand-bg border border-brand-border text-brand-slate rounded-xl transition shadow-sm hover:shadow-md">
         <Bell size={16} />
-        <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold rounded-full ${hasHigh ? 'bg-rose-600 text-white' : 'bg-amber-500 text-brand-ink'}`}>
+        <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold rounded-full ${hasHigh ? 'bg-rose-600 text-white' : 'bg-amber-500 text-brand-cocoa'}`}>
           {alerts.length}
         </span>
       </button>

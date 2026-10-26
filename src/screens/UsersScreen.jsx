@@ -162,7 +162,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
             </div>
           </div>
           <button onClick={() => setShowAddModal(true)} aria-label="Registrar usuario"
-            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-brand-ink text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
+            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-brand-cocoa text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
             <UserPlus size={15} />
             <span className="hidden sm:inline">Registrar usuario</span>
           </button>
