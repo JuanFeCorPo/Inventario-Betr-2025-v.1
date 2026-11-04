@@ -57,7 +57,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
       <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={trapTab}
         className={`modal-panel bg-white rounded-2xl shadow-2xl p-5 sm:p-8 w-full ${sizes[size]} max-h-[85vh] overflow-y-auto relative outline-none`}>
         <button onClick={onClose} aria-label="Cerrar"
-          className="absolute top-4 right-4 text-brand-gray hover:text-brand-ink transition-colors p-1 rounded-lg hover:bg-brand-bg">
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center vidrio text-brand-gray hover:text-brand-ink transition rounded-lg">
           <X size={20} />
         </button>
         <h2 className="text-xl font-bold mb-6 pr-8 text-brand-ink">{title}</h2>
@@ -197,13 +197,15 @@ export const Textarea = ({ className = '', ...props }) => (
 // ── Botones ──────────────────────────────────
 export const Button = ({ variant = 'primary', size = 'md', className = '', children, ...props }) => {
   const variants = {
-    primary:   'bg-brand-orange hover:bg-brand-amber text-brand-cocoa font-semibold shadow-md hover:shadow-brand-orange/30',
-    secondary: 'bg-brand-bg hover:bg-brand-border text-brand-slate border border-brand-border',
-    outline:   'bg-white hover:bg-brand-bg text-brand-slate border border-brand-border shadow-sm',
-    danger:    'bg-rose-600 hover:bg-rose-700 text-white font-semibold',
-    dangerGhost: 'text-rose-600 hover:bg-rose-50 font-medium',
-    warning:   'bg-brand-amber hover:bg-brand-orange text-brand-cocoa font-semibold',
-    ghost:     'text-brand-slate hover:text-brand-ink hover:bg-brand-bg',
+    // Todos en vidrio (mismo lenguaje que la barra de navegación): naranja = acción
+    // principal, rojo = peligro, claro = lo secundario.
+    primary:   'vidrio-naranja font-semibold',
+    secondary: 'vidrio text-brand-slate hover:text-brand-ink',
+    outline:   'vidrio text-brand-slate hover:text-brand-ink',
+    danger:    'vidrio-peligro font-semibold',
+    dangerGhost: 'vidrio text-rose-600 hover:text-rose-700 font-medium',
+    warning:   'vidrio-naranja font-semibold',
+    ghost:     'vidrio text-brand-slate hover:text-brand-ink',
   };
   const sizes = { md: 'px-5 py-2.5', sm: 'px-3 py-2 text-xs' };
   return (
@@ -223,7 +225,7 @@ export const Dropdown = ({ value, onChange, options, label: prefix }) => {
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(p => !p)} aria-expanded={open} aria-label={prefix ? `${prefix}: ${label}` : undefined}
-        className="flex items-center justify-between gap-3 min-w-[160px] bg-brand-bg border border-brand-border hover:border-brand-orange/50 text-brand-ink text-sm px-4 py-2.5 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
+        className="flex items-center justify-between gap-3 min-w-[160px] vidrio text-brand-ink text-sm px-4 py-2.5 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-brand-orange/40">
         <span className="truncate">{prefix && <span className="text-brand-gray">{prefix}: </span>}{label}</span>
         <ChevronDown size={14} className={`text-brand-gray transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -261,7 +263,7 @@ export const ToastHost = ({ toast, onDismiss }) => {
   const t = toast ?? ultimo.current;
   if (!visible || !t) return null;
   return (
-    <div className="fixed bottom-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
+    <div className="fixed bottom-20 sm:bottom-4 inset-x-0 z-[60] flex justify-center px-4 pointer-events-none">
       <div key={t.id} role="status" aria-live="polite"
         className={`pointer-events-auto flex items-center gap-1 bg-brand-ink text-white text-sm pl-4 pr-1.5 py-1.5 rounded-xl shadow-xl max-w-full ${toast ? 'animate-reveal' : 'animate-toast-out'}`}>
         <span className="py-1.5 pr-2 min-w-0 truncate">{t.message}</span>

@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 import { ChevronDown } from 'lucide-react';
 import { Modal, Button, Spinner, Field, FormActions } from '../ui';
 import { fieldClass } from '../ui/fieldClasses';
-import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_MANTENIMIENTO, FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT, CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
+import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_MANTENIMIENTO, FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT, CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES, CATEGORIAS_CON_CARGADOR } from '../../config/constants';
 import { findDuplicateConflicts } from '../../utils/duplicates';
 import { hoyLocal } from '../../utils/format';
 import { DuplicateWarningModal, DiscardChangesModal } from './OtherModals';
@@ -111,6 +111,8 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
         delete data.frecuenciaMantenimientoMeses;
         delete data.sinMantenimiento;
       }
+      if (CATEGORIAS_CON_CARGADOR.includes(data.categoria)) data.cargador = (data.cargador ?? '').trim().toUpperCase();
+      else delete data.cargador;
       if (!CATEGORIAS_CON_ESPECIFICACIONES.includes(data.categoria)) {
         CAMPOS_ESPECIFICACIONES.forEach(({ key }) => delete data[key]);
       }
@@ -143,9 +145,15 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
             <input name="numeroInventario" value={item.numeroInventario??''} onChange={handleChange} placeholder="Ej: BTR-0123"
               autoComplete="off" aria-required="true" aria-invalid={!!errors.numeroInventario} className={f} />
           </Field>
-          <Field label="Nº de serial" className="md:col-span-2">
+          <Field label="Nº de serial" className={CATEGORIAS_CON_CARGADOR.includes(item.categoria) ? '' : 'md:col-span-2'}>
             <input name="numeroSerial" value={item.numeroSerial??''} onChange={handleChange} autoComplete="off" className={f} />
           </Field>
+          {CATEGORIAS_CON_CARGADOR.includes(item.categoria) && (
+            <Field label="Cargador" hint="Nº de inventario del cargador de este portátil.">
+              <input name="cargador" value={item.cargador??''} onChange={handleChange} placeholder="Ej: BM-INV-0226"
+                autoComplete="off" className={`${f} font-mono`} />
+            </Field>
+          )}
 
           <SectionTitle>Estado y asignación</SectionTitle>
           <Field label="Estado" hint={reactivando ? 'Al cambiar el estado, el equipo vuelve al inventario activo.' : undefined}>
@@ -224,6 +232,9 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
           )}
 
           <SectionTitle>Notas</SectionTitle>
+          <Field label="Adicionales o accesorios" hint="Lo que viene con el equipo. Ej: batería adicional, cargador, memoria SD." className="md:col-span-2">
+            <input name="accesorios" value={item.accesorios??''} onChange={handleChange} autoComplete="off" className={f} />
+          </Field>
           <Field label="Observaciones" className="md:col-span-2">
             <textarea name="observaciones" value={item.observaciones??''} onChange={handleChange}
               className={`${f} h-24 resize-none`} />

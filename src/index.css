@@ -4,11 +4,13 @@
 
 /* Los colores de marca viven en tailwind.config.js (theme.extend.colors.brand) — única fuente de verdad. */
 
-/* IBM Plex Sans como fuente principal, servida desde el propio sitio (main.jsx): las fuentes de CDN
+/* Plus Jakarta Sans como fuente principal, servida desde el propio sitio (main.jsx): las fuentes de CDN
    externo (cdnfonts, y antes Google) cambiaban el ancho del texto entre visitas y descuadraban tablas. */
 body {
   @apply font-sans bg-brand-bg text-brand-ink;
   -webkit-font-smoothing: antialiased;
+  /* Plus Jakarta va algo apretada en tamaños pequeños: un poco de aire mejora la lectura */
+  letter-spacing: 0.01em;
 }
 
 /* Cifras de ancho fijo en tablas (fechas, Nº, totales alinean en columna) */
@@ -160,10 +162,22 @@ input[type="date"] { min-height: 2.75rem; }
 .bg-glow {
   background: radial-gradient(600px 400px at 100% 0%, rgba(230, 142, 0, 0.07), transparent 70%);
 }
+/* Login: luz cálida de marca (naranja arriba, ámbar abajo) sobre el fondo neutro.
+   Solo degradados: nada de desenfoques grandes. */
+/* Barra de navegación: tinta de marca con una luz naranja y una retícula muy tenue (tecnológica, sobria) */
+.bg-nav-tech {
+  background:
+    radial-gradient(640px 240px at 6% 0%, rgba(230, 142, 0, 0.22), transparent 70%),
+    radial-gradient(520px 280px at 100% 100%, rgba(237, 170, 0, 0.08), transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 100% 28px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 28px 100%,
+    linear-gradient(180deg, #1C2B35 0%, #15212A 100%);
+}
 .bg-glow-login {
   background:
-    radial-gradient(500px 500px at 100% 0%, rgba(230, 142, 0, 0.1), transparent 70%),
-    radial-gradient(400px 400px at 0% 100%, rgba(94, 106, 116, 0.1), transparent 70%);
+    radial-gradient(720px 560px at 100% 0%, rgba(230, 142, 0, 0.16), transparent 68%),
+    radial-gradient(560px 460px at 0% 100%, rgba(237, 170, 0, 0.12), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%);
 }
 
 /* Respeta a quien pidió menos movimiento: se quedan los fundidos, se va el desplazamiento y escala */
@@ -181,3 +195,59 @@ input[type="date"] { min-height: 2.75rem; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #5E6A7440; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #5E6A7480; }
+/* ── Vidrio: el lenguaje de los botones de la barra, en todo el sistema ──
+   .vidrio-oscuro: sobre la barra y zonas oscuras (blanco translúcido, borde claro).
+   .vidrio: botones secundarios sobre fondos claros (blanco translúcido que deja ver
+   la luz del fondo, borde fino y un brillo interior). Las acciones principales siguen
+   en naranja sólido: el vidrio es para lo secundario. */
+.vidrio-oscuro {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.vidrio-oscuro:hover { background-color: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.22); color: #fff; }
+
+.vidrio {
+  background-color: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(28, 43, 53, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(28, 43, 53, 0.06), 0 4px 14px rgba(28, 43, 53, 0.05);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.vidrio:hover { background-color: rgba(255, 255, 255, 0.92); border-color: rgba(28, 43, 53, 0.16); }
+.vidrio:disabled { background-color: rgba(255, 255, 255, 0.5); }
+
+/* Acción principal en vidrio: el naranja de marca con brillo translúcido arriba,
+   borde claro y un halo naranja. El texto cocoa mantiene el contraste (≥ 5,8:1). */
+.vidrio-naranja {
+  background-color: #E68E00;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 55%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 18px rgba(230, 142, 0, 0.28), 0 1px 2px rgba(28, 43, 53, 0.12);
+  color: #3B2200;
+}
+.vidrio-naranja:hover { background-color: #EDAA00; }
+.vidrio-naranja:disabled { background-color: #686D72; background-image: none; color: #fff; box-shadow: none; border-color: transparent; }
+
+/* Botón oscuro en vidrio (Continuar con Google, enviar mensaje) */
+.vidrio-tinta {
+  background-color: #1C2B35;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 55%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 8px 20px rgba(28, 43, 53, 0.22);
+  color: #fff;
+}
+.vidrio-tinta:hover { background-color: #243744; }
+.vidrio-tinta:disabled { opacity: 0.45; }
+
+/* Peligro en vidrio (Eliminar) */
+.vidrio-peligro {
+  background-color: #E11D48;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 55%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px rgba(225, 29, 72, 0.25);
+  color: #fff;
+}
+.vidrio-peligro:hover { background-color: #BE123C; }

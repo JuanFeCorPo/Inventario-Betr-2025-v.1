@@ -109,11 +109,56 @@ dismissedAlerts/{alertId}          # alertas descartadas, compartidas entre usua
 
 Cada entrada: `{ timestamp, user, action, changes? }`. Se escribe en cada edición, nota, baja o mantenimiento registrado — **nunca** en la creación del equipo: esa primera entrada ("Equipo creado…") se **sintetiza en la UI** a partir de `createdAt`/`addedByEmail` (ver `PreviewModal.jsx`), justamente para que un Lector pueda crear equipos sin necesitar permiso de escritura en `historial` (reservado a Administrador).
 
+### 3.2b `puestos/{id}` — puestos de trabajo y hoja de vida (F-MAN-02)
+
+`{ nombre, area: 'Operaciones' | 'Administrativos', grupo?, grupoOrden?, personas: [{ nombre, correo }], correos: [...], observaciones, origen?, hojaOriginal?, createdAt, addedByEmail }`, con subcolección `historial/{entryId}`: `{ fecha, tipo: 'preventivo' | 'correctivo' | 'cambio' | 'novedad' | 'nota', descripcion, responsable, reporta?, equipoId?, reemplazaA?, retirado?: { equipoId, codigo, nombre, casilla }, timestamp, user }`. (`carpetaEvidencia` ya no se usa: el enlace de Drive por puesto se quitó.)
+
+**Equipo de trabajo** (`grupo`, la carpeta de Drive: Optimización, Diseño…): la lista agrupa Área → equipo de trabajo → puesto (`agruparPuestos`). Si el puesto no lo tiene guardado, `grupoDe` lo saca de `hojaOriginal` ("1. Hoja de Vida - Equipos de Optimización/…" → Optimización, orden 1).
+
+**Casillas F-MAN-02** (`CASILLAS` en `utils/puestos.js`): CPU/Portátil, Monitor, UPS, Teclado, Mouse, Celular, Audífonos, Accesorios. `casillaDe(equipo)` la deduce de la categoría (y del nombre para teclado/mouse); `equipo.casilla` la fija cuando se asigna a otra a mano. Agregar y reemplazar ofrecen solo equipos de esa casilla (primero los Disponibles). Lo que sale queda en el historial con `retirado` y se muestra tachado en su casilla (`retiradosDelPuesto`; para lo importado se lee el texto "Sale … (tachado en la hoja de vida)"). Las líneas "Audífonos: …" de Observaciones son componentes sin Nº.
+
+**Trasladar** (`trasladarEquipo`): desde el puesto de origen, el equipo pasa a la misma casilla del destino en un solo lote. Agregar, reemplazar, retirar y trasladar devuelven una función **Deshacer** (restaura los campos del equipo y borra los registros creados en las hojas de los puestos; el historial del equipo conserva una nota "Se deshizo…").
+
+Un equipo pertenece a un puesto con `equipo.puestoId`. La hoja de vida **no se guarda aparte**: `HojaDeVida.jsx` la arma con el puesto, sus equipos (`equiposDelPuesto`) y el historial. Identificación y hardware salen del equipo principal (CPU, o portátil si no hay CPU). Cada acción de `usePuestos` escribe en un solo `writeBatch` el equipo, su historial y el del puesto:
+- **Agregar / reemplazar / retirar** componente: actualiza `puestoId` y `personaEncargada` (= nombre del puesto; al salir queda `Betrmedia`, el valor de stock). Un equipo `Disponible` que entra pasa a `En Uso`. Reemplazar equivale al "tachado" de la hoja de Excel.
+- **Mantenimiento preventivo**: además actualiza `ultimoMantenimiento` del equipo principal (la pantalla de Mantenimientos queda al día).
+- Renombrar un puesto actualiza `personaEncargada` de sus equipos.
+
+`personas[].correo` (y su copia plana `correos`) servirá para que el Colaborador vea "Mi puesto".
+
+**Hoja de vida de un equipo suelto (F-MAN-03).** Cámaras, micrófonos, trípodes, luces y cualquier otro equipo tienen su hoja en el detalle del equipo (`PreviewModal`): se arma con el equipo (incluida la casilla `accesorios`, "Adicionales o accesorios") y su subcolección `historial`. Los registros de hoja de vida llevan campos (`tipo`, `fecha`, `descripcion`, `responsable`, `reporta?`) además de `action`; los anteriores se reconocen por su texto (`entradasDeEquipo`). "Registrar" usa `useInventory.registrarEvento`.
+
+**Descargas con el diseño exacto de los formatos.** `utils/hojaDeVida.js` arma los datos (`datosHojaPuesto`, `datosHojaEquipo`) y el PDF (`htmlHojaPuesto`, `htmlHojaEquipo`: la misma cuadrícula, colores del tema de las hojas #EA4335 / #666666 / #D41500, tachados en rojo). El Excel (`utils/hojaDeVidaExport.js`, ExcelJS cargado solo al descargar) llena las **plantillas reales** `public/plantillas/F-MAN-02.xlsx` y `F-MAN-03.xlsx` (logo, bordes, celdas combinadas); historial y novedades se reescriben copiando el estilo de la plantilla. Las plantillas se regeneran desde dos hojas reales con `node scripts/hojas-de-vida/crear-plantillas.mjs "<F-MAN-02>" "<F-MAN-03>"` (borra los datos). `DescargarHoja.jsx` y `hooks/useDescargasHoja.js` ponen los botones.
+
+**Importación de las hojas de Excel (una sola vez).** Dos pasos:
+1. `node scripts/hojas-de-vida/preparar-importacion.mjs "<carpeta>"` lee las hojas exportadas de Drive (con el tachado, vía `leer-hoja.mjs`) y `decisiones-importacion.xlsx`, y escribe `plan-importacion.json` en esa carpeta. La carpeta tiene datos personales: nunca entra al repo. F-MAN-02 de un puesto → puesto; F-MAN-02 de backup y F-MAN-03 → historial del equipo; tachado → componente que salió. Los cargadores de portátil no son equipos: su código va en la casilla `cargador` del portátil (`CATEGORIAS_CON_CARGADOR`); la importación la llena con lo que dicen sus Observaciones.
+2. En la app, Puestos → **Importar hojas de vida** (Administrador) carga el plan, lo cruza con el inventario en vivo (`utils/importarHojas.js`: códigos repetidos o De Baja no se tocan, avisos) y lo escribe en lotes (`usePuestos.importarHojas`). Los puestos quedan con `origen: 'hoja-de-vida'` y el botón desaparece; los registros importados llevan `importado: true`.
+
+### 3.2c `tickets/{id}` — solicitudes de soporte de los colaboradores
+
+`{ codigo ('T-0311-4F2'), creadoPor: { uid, email, nombre }, categoria: 'equipo' | 'internet' | 'software' | 'cuentas' | 'impresora' | 'otro', urgencia: 'normal' | 'bloquea', puestoId?, puestoNombre, equipoId?, equipoNombre, equipoCodigo, descripcion, estado: 'recibido' | 'en_proceso' | 'resuelto', creadoAt (hora del servidor), actualizado, mensajes: [{ autor: 'ti' | 'colaborador', nombre, texto, fecha, resolucion? }], vistoPorTI, vistoPorColaborador, tomadoPor?, equipoEnMantenimiento?, solucion?, resueltoAt?, resueltoPor? }`.
+
+- **Colaborador** (`ColaboradorScreen`, `useMiPuesto` / `useMisTickets`): ve sus puestos (su correo en `puestos.correos`, que T.I. escribe en Editar puesto) y los equipos de esos puestos, reporta (`ReportarModal`) y conversa en sus solicitudes.
+- **T.I.** (`SolicitudesScreen`, `useTicketsTI`): bandeja con abiertas primero (las que impiden trabajar arriba). Tomar (opcional: el equipo pasa a En Mantenimiento), responder, resolver y reabrir. Al **resolver**, en un solo lote: la solicitud queda resuelta y, si se marca, la hoja de vida del puesto recibe una **Novedad** (el reporte, con quién lo hizo) y un **Correctivo** (la solución); el equipo recibe el correctivo en su historial y vuelve al estado elegido.
+- **Reglas** (`firestore.rules`): el Colaborador solo lee los puestos con su correo, los equipos de esos puestos (consulta por `puestoId ==`) y sus propias solicitudes; crea solicitudes a su nombre (validadas: campos, categoría, hora del servidor, puesto propio) y solo puede agregar mensajes. Tomar/resolver es del Administrador (regla general).
+- El botón **Solicitudes** del inventario muestra cuántas piden atención (`pendientesTI`: nuevas o con mensaje sin leer).
+
+**Eliminar un puesto** (`eliminarPuesto`): no se borra; queda con `eliminado: true` (oculto, con su historial) y sus equipos salen (En Uso → Disponible, Encargado Betrmedia). Devuelve Deshacer.
+
 ### 3.3 `users/{uid}`
 
-`{ email, role: 'Lector' | 'Administrador', active: boolean, history: [...] }`. El doc ID es el UID de Firebase Auth — los usuarios se crean primero en Firebase Auth (consola) y luego se registran aquí manualmente desde `UsersScreen`.
+`{ email, nombre?, role: 'Administrador' | 'Lector' | 'Colaborador', active: boolean, createdAt?, history: [...] }`. El doc ID es el UID de Firebase Auth. Dos formas de llegar aquí:
+
+- **Correo/contraseña (personal de T.I.):** la cuenta se crea en Firebase Auth (consola) y se registra manualmente desde `UsersScreen` con su UID.
+- **Google Workspace (colaboradores):** la primera vez que alguien entra con "Continuar con Google" y su correo es `@betrmedia.com` (verificado), `App.jsx` crea su perfil como `Colaborador` activo. `firestore.rules` (`isValidSelfSignup`) solo permite exactamente eso: su propio UID, su propio correo, rol Colaborador. El dominio vive en `COMPANY_DOMAIN` (`src/utils/roles.js`) y en `isCompanyGoogleUser` (reglas): si cambia, cambiar ambos.
+
+El Administrador cambia el rol de cualquiera desde `UsersScreen` (selector de 3 roles).
 
 ---
+
+### 3.4 Navegación del personal de T.I.
+
+`App.jsx` manda al Colaborador a `ColaboradorScreen` y al personal de T.I. a `StaffApp`, que pinta el marco `AppShell` (pestañas Inicio · Solicitudes · Puestos · Mantenimientos, Avisos y menú de cuenta con Usuarios) y la pantalla activa. `useResumenTI` calcula para el marco lo que pide atención (solicitudes sin atender, puestos con pendientes, mantenimientos vencidos y alertas del inventario). Inicio (`InventoryDashboard`) empieza con la franja **Hoy** (`HoyBand`) y sigue con el inventario.
 
 ## 4. Funcionalidades principales
 
@@ -143,7 +188,8 @@ Export de inventario completo, historial de un equipo, o reporte por periodo (`u
 
 ### 4.6 Autenticación y seguridad
 - **Login:** Firebase Auth (email/contraseña), persistencia de sesión limitada al navegador (`browserSessionPersistence`).
-- **Autorización de dos niveles:** estar autenticado en Firebase no basta — además debe existir un doc en `users/{uid}` con `active: true`. Roles: `Lector` (solo lectura + crear equipos) y `Administrador` (todo).
+- **Autorización de dos niveles:** estar autenticado en Firebase no basta — además debe existir un doc en `users/{uid}` con `active: true`. Roles: `Administrador` (todo), `Lector` (solo lectura + crear equipos) y `Colaborador` (cuenta de Google de la empresa; **no ve el inventario**: las reglas usan `isActiveStaff()` = Administrador o Lector para todo `artifacts/…`, historial y alertas). El Colaborador solo ve `ColaboradorScreen`, que será la puerta de "Mi puesto", reportes y solicitudes.
+- **Login con Google:** `signInWithPopup` con `hd: betrmedia.com` (solo sugiere el dominio; el control real es `accessForUnregistered` en `utils/roles.js` y las reglas). El bloqueo por intentos fallidos aplica solo a correo/contraseña.
 - **Bloqueo de login** (`utils/loginLockout.js`): 3 intentos fallidos → bloqueo de 1 hora, guardado en Firestore (`loginAttempts/{email}`, doc ID = correo normalizado) para que sea real y no se evada borrando el caché del navegador. El mensaje de error es siempre el mismo ("Email o contraseña incorrectos") sin importar la causa (contraseña mala, correo inexistente, cuenta bloqueada) — no revela información al atacante.
 - **Cierre de sesión por inactividad** (`utils/idle.js` + `useIdleTimeout.js`): 15 min por defecto, con aviso 20 s antes del cierre. Implementado por comparación de timestamps (no `setTimeout` puro), porque los navegadores congelan los timers de pestañas en segundo plano — justo cuando el usuario se ausenta. Vive en `App.jsx` (no en una pantalla puntual), así que cubre toda la app.
 

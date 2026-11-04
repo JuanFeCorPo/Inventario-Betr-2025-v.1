@@ -5,24 +5,47 @@ import {
 import {
   Users, ArrowLeft, Shield, BookOpen,
   ToggleLeft, ToggleRight, Loader2, UserCheck,
-  UserX, UserPlus, X, History, AlertTriangle
+  UserX, UserPlus, X, History, AlertTriangle, User
 } from 'lucide-react';
 import { Button, Modal, EmptyState, Field, FormActions, Spinner, ToastHost } from '../components/ui';
 import { fieldClass } from '../components/ui/fieldClasses';
 import { HistoryModal } from '../components/modals/OtherModals';
 import useAsyncAction from '../hooks/useAsyncAction';
 import useToast from '../hooks/useToast';
+import { ROLES, sortUsers } from '../utils/roles';
 
-const ROLES = ['Lector', 'Administrador'];
+// Qué puede hacer cada rol (va en el title del selector).
+const ROLE_HELP = {
+  Administrador: 'Todo: editar, dar de baja, usuarios',
+  Lector:        'Ve el inventario y puede añadir equipos',
+  Colaborador:   'Solo su puesto y sus tickets; no ve el inventario',
+};
 
-const RoleBadge = ({ role }) => (
-  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border
-    ${role === 'Administrador'
-      ? 'bg-brand-orange/10 text-brand-ember border-brand-orange/20'
-      : 'bg-brand-slate/10 text-brand-slate border-brand-slate/20'}`}>
-    {role === 'Administrador' ? <Shield size={10} /> : <BookOpen size={10} />}
-    {role}
-  </span>
+const ROLE_STYLE = {
+  Administrador: { cls: 'bg-brand-orange/10 text-brand-ember border-brand-orange/20', Icon: Shield },
+  Lector:        { cls: 'bg-brand-slate/10 text-brand-slate border-brand-slate/20',   Icon: BookOpen },
+  Colaborador:   { cls: 'bg-brand-bg text-brand-gray border-brand-border',             Icon: User },
+};
+
+const RoleBadge = ({ role }) => {
+  const { cls, Icon } = ROLE_STYLE[role] ?? ROLE_STYLE.Lector;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cls}`}>
+      <Icon size={10} />
+      {role}
+    </span>
+  );
+};
+
+// Selector de rol compacto, en la fila del usuario.
+const RoleSelect = ({ user, disabled, onChange }) => (
+  <select value={user.role ?? 'Lector'} disabled={disabled}
+    onChange={e => onChange(user, e.target.value)}
+    aria-label={`Rol de ${user.email}`}
+    title={disabled ? 'Es el único administrador activo' : ROLE_HELP[user.role ?? 'Lector']}
+    className="bg-white border border-brand-border text-brand-ink text-xs font-semibold pl-2.5 pr-7 h-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange/50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+    {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+  </select>
 );
 
 // Modal para registrar un usuario ya existente en Firebase Auth
@@ -123,12 +146,12 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
   const isLastActiveAdmin = (user) =>
     user.role === 'Administrador' && (user.active ?? true) && activeAdminCount <= 1;
 
-  const toggleRole = (user) => {
+  const changeRole = (user, newRole) => {
+    if (newRole === (user.role ?? 'Lector')) return;
     if (isLastActiveAdmin(user)) {
       setPageError('No puedes quitarle el rol de Administrador: es el único administrador activo.');
       return;
     }
-    const newRole = user.role === 'Administrador' ? 'Lector' : 'Administrador';
     updateUser(user.id, { role: newRole }, `Rol cambiado a "${newRole}".`);
   };
 
@@ -152,17 +175,17 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
         {/* Header */}
         <header className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
-              className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition shadow-sm text-brand-slate hover:text-brand-ink">
+            {onBack && <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
+              className="p-2.5 vidrio rounded-xl transition text-brand-slate hover:text-brand-ink">
               <ArrowLeft size={18} />
-            </button>
+            </button>}
             <div>
               <h1 className="text-xl font-bold text-brand-ink">Gestión de usuarios</h1>
               <p className="text-xs text-brand-gray mt-0.5">Solo los usuarios registrados aquí pueden acceder al sistema</p>
             </div>
           </div>
           <button onClick={() => setShowAddModal(true)} aria-label="Registrar usuario"
-            className="flex items-center gap-2 bg-brand-orange hover:bg-brand-amber text-brand-cocoa text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-md hover:shadow-brand-orange/30 flex-shrink-0">
+            className="flex items-center gap-2 vidrio-naranja text-sm font-semibold px-4 py-2.5 rounded-xl transition flex-shrink-0">
             <UserPlus size={15} />
             <span className="hidden sm:inline">Registrar usuario</span>
           </button>
@@ -185,7 +208,8 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
           <div className="text-sm">
             <p className="font-semibold text-brand-ink">Acceso controlado</p>
             <p className="text-brand-slate mt-0.5">
-              Créalo en <span className="font-medium text-brand-ink">Firebase → Authentication</span> y regístralo aquí con su UID.
+              Los colaboradores entran con su cuenta de Google de la empresa y quedan como <span className="font-medium text-brand-ink">Colaborador</span>.
+              Las cuentas con contraseña se crean en <span className="font-medium text-brand-ink">Firebase → Authentication</span> y se registran aquí con su UID.
             </p>
           </div>
         </div>
@@ -208,7 +232,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
             <EmptyState icon={<Users size={32} />} title="No hay usuarios registrados aún." />
           ) : (
             <ul className="divide-y divide-brand-border">
-              {users.map(user => {
+              {sortUsers(users).map(user => {
                 const isActive  = user.active ?? true;
                 const isSelf    = user.id === currentUser.uid;
                 const isSaving  = saving === user.id;
@@ -222,23 +246,20 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                     <div className="sm:hidden space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-semibold text-brand-ink text-sm truncate">{user.email}</p>
+                          <p className="font-semibold text-brand-ink text-sm truncate">{user.nombre || user.email}</p>
+                          {user.nombre && <p className="text-xs text-brand-gray truncate">{user.email}</p>}
                           {isSelf && <span className="text-xs text-brand-ember">← Tú</span>}
                         </div>
-                        <RoleBadge role={user.role ?? 'Lector'} />
+                        {isSelf
+                          ? <RoleBadge role={user.role ?? 'Lector'} />
+                          : <RoleSelect user={user} disabled={isSaving || isLastAdmin} onChange={changeRole} />}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <button onClick={() => setHistoryUser(user)}
-                          className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg font-medium transition">
+                          className="flex items-center gap-1.5 text-xs vidrio text-blue-700 px-3 py-2 rounded-lg font-medium transition">
                           <History size={12} /> Historial
                         </button>
                         {!isSelf && (<>
-                          <button onClick={() => toggleRole(user)} disabled={isSaving || isLastAdmin}
-                            title={isLastAdmin ? 'Es el único administrador activo' : undefined}
-                            className="flex items-center gap-1.5 text-xs bg-brand-bg hover:bg-brand-border border border-brand-border text-brand-slate px-3 py-2 rounded-lg font-medium transition disabled:opacity-40">
-                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Shield size={12} />}
-                            Cambiar rol
-                          </button>
                           <button onClick={() => toggleActive(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : undefined}
                             className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-medium transition disabled:opacity-40 border
@@ -253,10 +274,16 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                     {/* Desktop */}
                     <div className="hidden sm:grid grid-cols-[1fr_160px_120px_100px] gap-4 items-center">
                       <div className="min-w-0">
-                        <p className="font-semibold text-brand-ink text-sm truncate">{user.email}</p>
+                        <p className="font-semibold text-brand-ink text-sm truncate">{user.nombre || user.email}</p>
+                        {user.nombre && <p className="text-xs text-brand-gray truncate">{user.email}</p>}
                         {isSelf && <span className="text-xs text-brand-ember">← Tu cuenta</span>}
                       </div>
-                      <RoleBadge role={user.role ?? 'Lector'} />
+                      <div className="flex items-center gap-2">
+                        {isSelf
+                          ? <RoleBadge role={user.role ?? 'Lector'} />
+                          : <RoleSelect user={user} disabled={isSaving || isLastAdmin} onChange={changeRole} />}
+                        {isSaving && <Loader2 size={14} className="animate-spin text-brand-ember" />}
+                      </div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isActive ? 'text-emerald-600' : 'text-brand-gray'}`}>
                         {isActive
                           ? <><ToggleRight size={16} className="text-emerald-500" /> Activo</>
@@ -266,18 +293,12 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
                         <button onClick={() => setHistoryUser(user)}
                           title="Ver historial"
                           aria-label={`Ver historial de ${user.email}`}
-                          className="p-2 rounded-lg text-brand-slate hover:text-blue-600 hover:bg-blue-50 transition">
+                          className="p-2 rounded-lg vidrio text-brand-slate hover:text-blue-600 transition">
                           <History size={15} />
                         </button>
                         {isSelf ? (
                           <span className="text-xs text-brand-gray italic">—</span>
                         ) : (<>
-                          <button onClick={() => toggleRole(user)} disabled={isSaving || isLastAdmin}
-                            title={isLastAdmin ? 'Es el único administrador activo' : `Cambiar a ${user.role === 'Administrador' ? 'Lector' : 'Administrador'}`}
-                            aria-label={`Cambiar rol de ${user.email}`}
-                            className="p-2 rounded-lg text-brand-slate hover:text-brand-ember hover:bg-brand-orange/10 transition disabled:opacity-40">
-                            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Shield size={15} />}
-                          </button>
                           <button onClick={() => toggleActive(user)} disabled={isSaving || isLastAdmin}
                             title={isLastAdmin ? 'Es el único administrador activo' : (isActive ? 'Desactivar acceso' : 'Activar acceso')}
                             aria-label={isActive ? `Desactivar acceso de ${user.email}` : `Activar acceso de ${user.email}`}
@@ -302,7 +323,7 @@ const UsersScreen = ({ db, currentUser, onBack }) => {
       <ToastHost toast={toast} onDismiss={dismissToast} />
 
       <HistoryModal isOpen={!!historyUser} onClose={() => setHistoryUser(null)}
-        item={historyUser ? { nombre: historyUser.email, history: historyUser.history } : null} />
+        item={historyUser ? { nombre: historyUser.nombre || historyUser.email, history: historyUser.history } : null} />
     </div>
   );
 };

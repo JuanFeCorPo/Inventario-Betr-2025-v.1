@@ -32,12 +32,12 @@ export default {
       },
       // Spinner más veloz: la carga se percibe más rápida
       animation: { spin: 'spin 0.7s linear infinite' },
-      // IBM Plex Sans (texto) + IBM Plex Mono (solo códigos: Nº de inventario y serial).
+      // Plus Jakarta Sans (texto: moderna y profesional) + IBM Plex Mono (solo códigos: Nº de inventario y serial).
       // Se sirven desde el propio sitio (@fontsource, ver main.jsx), sin depender de un CDN externo.
       fontFamily: {
-        sans:    ['"IBM Plex Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-        body:    ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        sans:    ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        body:    ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         mono:    ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
       },
     },

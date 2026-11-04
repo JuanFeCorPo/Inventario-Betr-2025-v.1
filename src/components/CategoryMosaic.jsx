@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { Package, List } from 'lucide-react';
-import { Button, StatusBar, StatusDot, Skeleton } from './ui';
+import { Button, StatusBar, Skeleton } from './ui';
 import { CATEGORY_ICONS } from '../config/categoryIcons';
 import { STATUS_DOT } from '../config/constants';
 import { groupByCategory, statusCounts } from '../utils/inventoryGroups';
@@ -12,7 +12,6 @@ const ATENCION = {
   'En Mantenimiento':  { texto: 'en mantenimiento',  clase: 'text-violet-700' },
 };
 
-const LEYENDA = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera de Servicio'];
 
 const GRID = { gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))' };
 
@@ -71,10 +70,7 @@ const CategoryMosaic = ({ items = [], onSelect, onShowAll, actions, loading = fa
         </div>
       </div>
 
-      {/* Leyenda: el color nunca es la única pista */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 px-1" aria-label="Significado de los colores">
-        {LEYENDA.map(s => <StatusDot key={s} status={s} />)}
-      </div>
+      {/* La leyenda de colores vive en la línea de estado del inventario (arriba) */}
 
       <div className="grid gap-3" style={GRID}>
         {groups.map(({ categoria, rows }, i) => {

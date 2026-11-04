@@ -14,6 +14,76 @@ service cloud.firestore {
     function isActiveAdmin() {
       return isActiveUser() && callerDoc().get('role', 'Lector') == 'Administrador';
     }
+    // Personal de T.I. (Administrador o Lector): el único que ve el inventario.
+    // El rol Colaborador (cuentas de Google de la empresa) queda por fuera.
+    // Un perfil sin rol es un usuario antiguo y cuenta como Lector.
+    function isActiveStaff() {
+      return isActiveUser() && callerDoc().get('role', 'Lector') in ['Administrador', 'Lector'];
+    }
+
+    // Cuenta de Google Workspace de la empresa, con correo verificado por Google.
+    // Si cambia el dominio, actualizar también COMPANY_DOMAIN en src/utils/roles.js.
+    function isCompanyGoogleUser() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower().matches('.*@betrmedia[.]com$');
+    }
+
+    // Auto-registro: la primera vez que un colaborador entra con Google, crea
+    // su propio perfil, solo como Colaborador activo y con su propio correo.
+    // No puede darse otro rol ni crear el perfil de otra persona.
+    function isValidSelfSignup(userId) {
+      let d = request.resource.data;
+      return isCompanyGoogleUser()
+        && request.auth.uid == userId
+        && d.keys().hasOnly(['email', 'nombre', 'role', 'active', 'createdAt', 'history'])
+        && d.email == request.auth.token.email.lower()
+        && d.nombre is string && d.nombre.size() <= 120
+        && d.role == 'Colaborador'
+        && d.active == true
+        && d.createdAt == request.time
+        && d.history is list && d.history.size() <= 1;
+    }
+
+    // ── Colaboradores (cuentas de Google de la empresa) ──
+    function isActiveColaborador() {
+      return isActiveUser() && callerDoc().get('role', 'Lector') == 'Colaborador';
+    }
+    function miCorreo() {
+      return request.auth.token.email.lower();
+    }
+    // El puesto tiene el correo del colaborador en "correos" (lo pone T.I. en Editar puesto).
+    function esMiPuesto(appId, puestoId) {
+      return puestoId is string && puestoId != ''
+        && miCorreo() in get(/databases/$(database)/documents/artifacts/$(appId)/public/data/puestos/$(puestoId)).data.get('correos', []);
+    }
+    // Nueva solicitud: a nombre propio, recién recibida, con la hora del servidor y
+    // (si es de un equipo) de un puesto propio.
+    function isValidTicketCreate(appId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['codigo', 'creadoPor', 'categoria', 'urgencia', 'puestoId', 'puestoNombre',
+          'equipoId', 'equipoNombre', 'equipoCodigo', 'descripcion', 'estado', 'creadoAt', 'actualizado',
+          'mensajes', 'vistoPorTI', 'vistoPorColaborador'])
+        && d.creadoPor.uid == request.auth.uid
+        && d.creadoPor.email == miCorreo()
+        && d.categoria in ['equipo', 'internet', 'software', 'cuentas', 'impresora', 'otro']
+        && d.urgencia in ['normal', 'bloquea']
+        && d.descripcion is string && d.descripcion.size() >= 5 && d.descripcion.size() <= 2000
+        && d.estado == 'recibido'
+        && d.creadoAt == request.time
+        && d.mensajes == []
+        && (d.puestoId == null || esMiPuesto(appId, d.puestoId));
+    }
+    // El colaborador solo puede agregar un mensaje (o marcar como visto) en su solicitud.
+    function isValidTicketComment() {
+      let antes = resource.data;
+      let d = request.resource.data;
+      return d.diff(antes).affectedKeys().hasOnly(['mensajes', 'actualizado', 'vistoPorTI', 'vistoPorColaborador'])
+        && d.mensajes.size() <= antes.mensajes.size() + 1
+        && d.mensajes.size() >= antes.mensajes.size()
+        && d.mensajes.size() <= 200;
+    }
 
     // Valida los documentos de bloqueo de login (ver src/utils/loginLockout.js).
     // Se escriben sin sesión iniciada (el bloqueo se revisa antes del login),
@@ -43,13 +113,30 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isActiveAdmin());
-      allow write: if isActiveAdmin();
+      allow create: if isActiveAdmin() || isValidSelfSignup(userId);
+      allow update, delete: if isActiveAdmin();
     }
 
+    // Inventario: solo personal de T.I. (Administrador/Lector), nunca Colaborador.
     match /artifacts/{appId}/public/data/{document=**} {
-      allow read:            if isActiveUser();
-      allow create:          if isActiveUser();
+      allow read:            if isActiveStaff();
+      allow create:          if isActiveStaff();
       allow update, delete:  if isActiveAdmin();
+    }
+
+    // ── Lo que puede ver un Colaborador (además, el personal de T.I. tiene la regla general) ──
+    // Solo sus puestos y los equipos de esos puestos (para "Mi puesto" y reportar).
+    match /artifacts/{appId}/public/data/puestos/{puestoId} {
+      allow read: if isActiveColaborador() && miCorreo() in resource.data.get('correos', []);
+    }
+    match /artifacts/{appId}/public/data/equipos/{equipoId} {
+      allow read: if isActiveColaborador() && esMiPuesto(appId, resource.data.get('puestoId', ''));
+    }
+    // Sus solicitudes: crearlas, verlas y comentarlas. Tomar y resolver es de T.I.
+    match /artifacts/{appId}/public/data/tickets/{ticketId} {
+      allow create: if isActiveColaborador() && isValidTicketCreate(appId);
+      allow read:   if isActiveColaborador() && resource.data.creadoPor.uid == request.auth.uid;
+      allow update: if isActiveColaborador() && resource.data.creadoPor.uid == request.auth.uid && isValidTicketComment();
     }
 
     // Historial de un equipo (subcolección): solo lectura para cualquier
@@ -57,7 +144,7 @@ service cloud.firestore {
     // notas, bajas). La creación de un equipo no requiere esta regla —
     // esa primera entrada se sintetiza en la app a partir de createdAt.
     match /artifacts/{appId}/public/data/equipos/{equipoId}/historial/{entryId} {
-      allow read:   if isActiveUser();
+      allow read:   if isActiveStaff();
       allow create: if isActiveAdmin();
     }
 
@@ -66,7 +153,7 @@ service cloud.firestore {
     // de consulta, aunque el bloque anidado de arriba ya cubre lecturas
     // normales por equipo.
     match /{path=**}/historial/{entryId} {
-      allow read: if isActiveUser();
+      allow read: if isActiveStaff();
     }
 
     // Bloqueo de login por intentos fallidos — debe ser accesible sin
@@ -76,10 +163,10 @@ service cloud.firestore {
       allow write: if isValidLoginAttemptWrite();
     }
 
-    // Alertas descartadas — compartidas entre todos los usuarios activos.
+    // Alertas descartadas — compartidas entre el personal de T.I.
     match /dismissedAlerts/{alertId} {
-      allow read:  if isActiveUser();
-      allow write: if isActiveUser() && isValidDismissedAlertWrite();
+      allow read:  if isActiveStaff();
+      allow write: if isActiveStaff() && isValidDismissedAlertWrite();
     }
 
   }

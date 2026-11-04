@@ -1,25 +1,40 @@
-import { Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, Database, ChevronDown } from 'lucide-react';
+import { usePopover } from '../hooks/usePopover';
 
-const accion = 'flex items-center gap-1.5 text-brand-slate hover:text-brand-ink text-xs font-medium px-2.5 h-8 rounded-lg hover:bg-white transition-colors';
-
-// Acciones sobre los datos del inventario, a la vista junto a la lista (antes vivían escondidas
-// en el menú "Más"). "Exportar" baja justo lo que se ve; Importar y Reporte son de Administrador.
-// En celular se quedan en el menú ⋮ del encabezado (hay poco espacio); entre 640 y 768 px
-// se muestran solo como icono.
-const DataActions = ({ isAdmin, exportLabel, exportTitle, onExport, onImport, onReport }) => (
-  <div className="hidden sm:flex items-center gap-0.5" role="group" aria-label="Acciones de datos">
-    <button type="button" onClick={onExport} className={accion} aria-label={exportLabel} title={exportTitle}>
-      <Download size={13} /> <span className="hidden md:inline">{exportLabel}</span>
-    </button>
-    {isAdmin && (<>
-      <button type="button" onClick={onImport} className={accion} aria-label="Importar desde Excel" title="Carga varios equipos a la vez desde un archivo Excel">
-        <Upload size={13} /> <span className="hidden md:inline">Importar</span>
+// Acciones de datos del inventario (se usan de vez en cuando): un solo menú "Datos"
+// junto al título del inventario, igual en computador y celular. "Exportar"
+// baja justo lo que se ve; Importar y Reporte son de Administrador.
+const DataActions = ({ isAdmin, exportLabel, exportTitle, onExport, onImport, onReport }) => {
+  const { open, setOpen, ref, shown } = usePopover();
+  const item = 'w-full flex items-start gap-2.5 px-3 py-2.5 text-sm text-left text-brand-ink hover:bg-brand-bg rounded-lg transition-colors';
+  const elegir = (fn) => () => { setOpen(false); fn(); };
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open}
+        aria-label="Exportar, importar o generar reporte" title="Exportar, importar o generar reporte"
+        className="h-10 px-3 flex items-center gap-1.5 vidrio text-brand-slate hover:text-brand-ink text-sm rounded-xl transition">
+        <Database size={15} aria-hidden="true" /> <span className="hidden md:inline">Datos</span> <ChevronDown size={14} className={`text-brand-gray transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      <button type="button" onClick={onReport} className={accion} aria-label="Generar reporte por periodo" title="Descarga los movimientos del inventario entre dos fechas">
-        <FileSpreadsheet size={13} /> <span className="hidden md:inline">Reporte</span>
-      </button>
-    </>)}
-  </div>
-);
+      {shown && (
+        <div role="menu" className={`absolute right-0 top-12 z-40 w-72 bg-white border border-brand-border rounded-2xl shadow-xl shadow-brand-ink/10 p-1.5 ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
+          <button role="menuitem" type="button" className={item} onClick={elegir(onExport)}>
+            <Download size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span><span className="block">{exportLabel}</span><span className="block text-xs text-brand-gray">{exportTitle}</span></span>
+          </button>
+          {isAdmin && (<>
+            <button role="menuitem" type="button" className={item} onClick={elegir(onImport)}>
+              <Upload size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <span><span className="block">Importar desde Excel</span><span className="block text-xs text-brand-gray">Carga varios equipos a la vez</span></span>
+            </button>
+            <button role="menuitem" type="button" className={item} onClick={elegir(onReport)}>
+              <FileSpreadsheet size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <span><span className="block">Reporte por periodo</span><span className="block text-xs text-brand-gray">Movimientos del inventario entre dos fechas</span></span>
+            </button>
+          </>)}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default DataActions;

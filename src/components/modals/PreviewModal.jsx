@@ -7,8 +7,13 @@ import { getMaintenanceInfo } from '../../utils/maintenance';
 import { formatFecha } from '../../utils/format';
 import { fieldClass } from '../ui/fieldClasses';
 import useAsyncAction from '../../hooks/useAsyncAction';
-import { CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES } from '../../config/constants';
-import { Edit, Archive, Trash2, StickyNote, Download } from 'lucide-react';
+import { CATEGORIAS_CON_ESPECIFICACIONES, CAMPOS_ESPECIFICACIONES, CATEGORIAS_CON_CARGADOR } from '../../config/constants';
+import { Edit, Archive, Trash2, StickyNote, Download, ClipboardPlus } from 'lucide-react';
+import { CATEGORIAS_CON_MANTENIMIENTO } from '../../config/constants';
+import { entradasDeEquipo, datosHojaEquipo } from '../../utils/hojaDeVida';
+import { TIPOS_EVENTO } from '../../utils/puestos';
+import DescargarHoja from '../puestos/DescargarHoja';
+import { EventoModal } from '../puestos/PuestoModals';
 
 const Field = ({ label, value }) => (
   <div>
@@ -17,8 +22,9 @@ const Field = ({ label, value }) => (
   </div>
 );
 
-const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote }) => {
+const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, onDeactivate, onDelete, onAddNote, onRegistrarEvento }) => {
   const [noteOpen,   setNoteOpen]   = useState(false);
+  const [eventoOpen, setEventoOpen] = useState(false);
   const [note,       setNote]       = useState('');
   const { busy: savingNote, error: noteError, run: runNote, reset: resetNote } = useAsyncAction();
 
@@ -40,6 +46,9 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
     return [...synthetic, ...(item.history ?? []), ...historial];
   }, [item, historial]);
 
+  // Hoja de vida F-MAN-03: lo que del historial va en el formato (más reciente arriba)
+  const entradasHoja = useMemo(() => entradasDeEquipo(historial).reverse(), [historial]);
+
   if (!item) return null;
 
   const maintenanceInfo = getMaintenanceInfo(item);
@@ -54,6 +63,7 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} title="Detalle del equipo" size="lg">
       <div className="space-y-5">
         {/* Encabezado */}
@@ -74,6 +84,7 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
           <Field label="Condición" value={item.condicion ?? 'Usado'} />
           <Field label="Nº de inventario" value={item.numeroInventario} />
           <Field label="Nº de serial" value={item.numeroSerial} />
+          {CATEGORIAS_CON_CARGADOR.includes(item.categoria) && <Field label="Cargador" value={item.cargador} />}
           <Field label="Encargado" value={item.personaEncargada} />
           <Field label="Fecha de ingreso" value={item.fechaIngreso?.toDate ? formatFecha(item.fechaIngreso.toDate()) : '—'} />
           {item.estado === 'De Baja' && (
@@ -101,12 +112,60 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
           </div>
         )}
 
+        {item.accesorios && (
+          <div>
+            <p className="text-xs text-brand-gray mb-1">Adicionales o accesorios</p>
+            <p className="text-brand-slate text-sm bg-brand-bg/60 border border-brand-border rounded-xl p-3">{item.accesorios}</p>
+          </div>
+        )}
+
         {/* Observaciones */}
         <div>
           <p className="text-xs text-brand-gray mb-1">Observaciones</p>
           <p className="text-brand-slate text-sm bg-brand-bg/60 border border-brand-border rounded-xl p-3">
             {item.observaciones || <span className="italic text-brand-gray">Sin observaciones.</span>}
           </p>
+        </div>
+
+        {/* Hoja de vida (F-MAN-03) */}
+        <div>
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-brand-ink">
+              Hoja de vida <span className="text-xs font-normal text-brand-gray">· F-MAN-03</span>
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {isAdmin && onRegistrarEvento && item.estado !== 'De Baja' && (
+                <button onClick={() => setEventoOpen(true)}
+                  className="flex items-center gap-1.5 text-xs text-brand-ember vidrio px-3 py-1.5 rounded-lg font-medium transition-colors">
+                  <ClipboardPlus size={12} /> Registrar
+                </button>
+              )}
+              <DescargarHoja size="sm" crearDatos={() => datosHojaEquipo(item, historial)} />
+            </div>
+          </div>
+          {entradasHoja.length === 0 ? (
+            <p className="text-sm text-brand-gray italic bg-brand-bg/60 border border-brand-border rounded-xl p-3">
+              Sin mantenimientos ni novedades registrados.
+            </p>
+          ) : (
+            <ol className="max-h-[30vh] overflow-y-auto divide-y divide-brand-border border border-brand-border rounded-xl">
+              {entradasHoja.map((e, i) => {
+                const t = TIPOS_EVENTO[e.tipo] ?? TIPOS_EVENTO.nota;
+                return (
+                  <li key={i} className="grid grid-cols-[80px_1fr] sm:grid-cols-[84px_92px_1fr] gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                    <span className="text-xs text-brand-gray tabular-nums pt-0.5">{e.fecha ? formatFecha(e.fecha) : '—'}</span>
+                    <span><span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${t.cls}`}>{t.label}</span></span>
+                    <p className="col-span-2 sm:col-span-1 text-brand-ink break-words">
+                      {e.descripcion}
+                      {(e.reporta || e.responsable) && (
+                        <span className="block text-xs text-brand-gray">{e.reporta ? `Reporta: ${e.reporta}` : e.responsable}</span>
+                      )}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
 
         {/* Trazabilidad */}
@@ -116,12 +175,12 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
             <div className="flex items-center gap-2">
               {isAdmin && (
                 <button onClick={() => { setNoteOpen(p => !p); resetNote(); }} aria-expanded={noteOpen}
-                  className="flex items-center gap-1.5 text-xs text-brand-ember bg-brand-orange/10 px-3 py-1.5 rounded-lg font-medium hover:bg-brand-orange/20 transition-colors">
+                  className="flex items-center gap-1.5 text-xs text-brand-ember vidrio px-3 py-1.5 rounded-lg font-medium transition-colors">
                   <StickyNote size={12} /> Agregar nota
                 </button>
               )}
               <button onClick={() => exportItemHistory({ ...item, history: combinedHistory })}
-                className="flex items-center gap-1.5 text-xs text-brand-slate bg-brand-bg px-3 py-1.5 rounded-lg font-medium hover:bg-brand-border transition-colors">
+                className="flex items-center gap-1.5 text-xs text-brand-slate hover:text-brand-ink vidrio px-3 py-1.5 rounded-lg font-medium transition-colors">
                 <Download size={12} /> Exportar
               </button>
             </div>
@@ -165,6 +224,12 @@ const PreviewModal = ({ isOpen, onClose, item: itemProp, isAdmin, db, onEdit, on
         )}
       </div>
     </Modal>
+    {onRegistrarEvento && (
+      <EventoModal isOpen={eventoOpen} onClose={() => setEventoOpen(false)}
+        aviso={CATEGORIAS_CON_MANTENIMIENTO.includes(item.categoria) ? 'Un preventivo también actualiza su próximo mantenimiento.' : ''}
+        onConfirm={async (ev) => { await onRegistrarEvento(item, ev); setEventoOpen(false); }} />
+    )}
+    </>
   );
 };
 

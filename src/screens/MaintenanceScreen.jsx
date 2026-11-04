@@ -143,13 +143,13 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
     <div className="min-h-screen bg-brand-bg font-sans">
       <div className="fixed inset-0 bg-glow pointer-events-none" />
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="relative z-10 max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         <header className="flex items-center gap-4 mb-8">
-          <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
-            className="p-2.5 bg-white hover:bg-brand-bg border border-brand-border rounded-xl transition shadow-sm text-brand-slate hover:text-brand-ink">
+          {onBack && <button onClick={onBack} aria-label="Volver al inventario" title="Volver al inventario"
+            className="p-2.5 vidrio rounded-xl transition text-brand-slate hover:text-brand-ink">
             <ArrowLeft size={18} />
-          </button>
+          </button>}
           <div>
             <h1 className="text-xl font-bold text-brand-ink">Mantenimientos preventivos</h1>
             <p className="text-xs text-brand-gray mt-0.5">Laptops y CPU, ordenados por urgencia</p>

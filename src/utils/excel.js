@@ -1,4 +1,4 @@
-import { CATEGORIAS, ESTADOS, CONDICIONES } from '../config/constants';
+import { CATEGORIAS, ESTADOS, CONDICIONES, CATEGORIAS_CON_CARGADOR } from '../config/constants';
 import { formatFechaHora } from './format';
 
 // La librería de Excel (xlsx) pesa bastante y la mayoría de las visitas
@@ -13,6 +13,7 @@ export const COLUMNS = [
   { key: 'condicion',        label: 'Condición' },
   { key: 'numeroInventario', label: 'N° Inventario' },
   { key: 'numeroSerial',     label: 'N° Serial' },
+  { key: 'cargador',         label: 'Cargador' },
   { key: 'fechaIngreso',     label: 'Fecha de Ingreso' },
   { key: 'personaEncargada', label: 'Persona Encargada' },
   { key: 'observaciones',    label: 'Observaciones' },
@@ -62,6 +63,7 @@ export async function exportInventory(items) {
     'Condición': item.condicion ?? 'Usado',
     'N° Inventario': sanitizeCell(item.numeroInventario),
     'N° Serial': sanitizeCell(item.numeroSerial),
+    'Cargador': sanitizeCell(item.cargador),
     'Fecha de Ingreso': item.fechaIngreso?.toDate ? item.fechaIngreso.toDate().toISOString().split('T')[0] : '',
     'Persona Encargada': sanitizeCell(item.personaEncargada),
     'Observaciones': sanitizeCell(item.observaciones),
@@ -152,6 +154,7 @@ const HEADER_MAP = {
   condicion: ['condicion'],
   numeroInventario: ['n inventario', 'numero inventario', 'no inventario'],
   numeroSerial: ['n serial', 'numero serial', 'serial'],
+  cargador: ['cargador'],
   fechaIngreso: ['fecha de ingreso', 'fecha ingreso', 'fecha'],
   personaEncargada: ['persona encargada', 'encargado', 'persona a cargo'],
   observaciones: ['observaciones', 'observacion'],
@@ -170,6 +173,7 @@ export function parseRow(row, index) {
   const nombre           = findField(row, 'nombre').toString().trim();
   const numeroInventario = findField(row, 'numeroInventario').toString().trim();
   const numeroSerial     = findField(row, 'numeroSerial').toString().trim();
+  const cargador         = findField(row, 'cargador').toString().trim().toUpperCase();
   const personaEncargada = findField(row, 'personaEncargada').toString().trim();
   const observaciones    = findField(row, 'observaciones').toString().trim();
 
@@ -205,6 +209,7 @@ export function parseRow(row, index) {
   return {
     _row: index + 2,
     nombre, categoria, estado, condicion, numeroInventario, numeroSerial,
+    ...(cargador && CATEGORIAS_CON_CARGADOR.includes(categoria) ? { cargador } : {}),
     fechaIngreso, personaEncargada, observaciones,
     errors, warnings,
   };

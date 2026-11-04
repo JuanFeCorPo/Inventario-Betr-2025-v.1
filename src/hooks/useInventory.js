@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { EQUIPOS_PATH, EQUIPOS_ELIMINADOS_PATH } from '../config/firebase';
 import { formatFecha } from '../utils/format';
+import { CATEGORIAS_CON_MANTENIMIENTO } from '../config/constants';
 
 const HISTORIAL = 'historial';
 
@@ -135,6 +136,28 @@ const useInventory = (db, user) => {
     await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
   };
 
+  // ── Registrar en la hoja de vida del equipo (F-MAN-03) ──
+  // Mantenimiento, novedad o nota con fecha propia. Se guarda con campos
+  // (tipo, fecha, descripción…) para armar el formato, y con `action` para la trazabilidad.
+  const registrarEvento = async (equipo, { tipo, fecha, descripcion, reporta }) => {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const fechaTs = Timestamp.fromDate(new Date(y, m - 1, d, 12));
+    const desc = descripcion.trim();
+    const etiqueta = { preventivo: 'Mantenimiento preventivo', correctivo: 'Mantenimiento correctivo', novedad: 'Novedad', nota: 'Nota' }[tipo];
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, EQUIPOS_PATH, equipo.id, HISTORIAL)), {
+      timestamp: Timestamp.now(), user: user.email,
+      tipo, fecha: fechaTs, descripcion: desc, responsable: user.nombre || user.email,
+      ...(reporta?.trim() ? { reporta: reporta.trim() } : {}),
+      action: `${etiqueta} (${formatFecha(fechaTs.toDate())}).\n${desc}${reporta?.trim() ? `\nReporta: ${reporta.trim()}` : ''}`,
+    });
+    if (tipo === 'preventivo' && CATEGORIAS_CON_MANTENIMIENTO.includes(equipo.categoria)) {
+      const previo = equipo.ultimoMantenimiento?.toMillis?.() ?? 0;
+      if (fechaTs.toMillis() > previo) batch.update(doc(db, EQUIPOS_PATH, equipo.id), { ultimoMantenimiento: fechaTs });
+    }
+    await batch.commit();
+  };
+
   // ── Importar en lote desde Excel ─────────────
   const importItems = async (rows) => {
     const BATCH_SIZE = 200; // cada fila implica 2 escrituras (equipo + historial); margen bajo el límite de 500/lote
@@ -199,7 +222,7 @@ const useInventory = (db, user) => {
     await deleteDoc(doc(db, EQUIPOS_ELIMINADOS_PATH, backup.tombstoneId));
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registerMaintenance };
+  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registerMaintenance, registrarEvento };
 };
 
 export default useInventory;

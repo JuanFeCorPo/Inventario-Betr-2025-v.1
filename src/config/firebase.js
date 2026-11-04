@@ -22,6 +22,10 @@ export const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'default-app-
 export const EQUIPOS_PATH            = `artifacts/${APP_ID}/public/data/equipos`;
 export const EQUIPOS_ELIMINADOS_PATH = `artifacts/${APP_ID}/public/data/equipos_eliminados`;
 export const ENCARGADOS_PATH         = `artifacts/${APP_ID}/public/data/encargados`;
+// Puestos de trabajo (hoja de vida F-MAN-02). Cada uno tiene su subcolección `historial`.
+export const PUESTOS_PATH            = `artifacts/${APP_ID}/public/data/puestos`;
+// Solicitudes de soporte (tickets) de los colaboradores.
+export const TICKETS_PATH            = `artifacts/${APP_ID}/public/data/tickets`;
 // Colección de nivel raíz (no bajo artifacts/.../public/data): debe ser
 // legible/escribible sin sesión iniciada, ya que el bloqueo se evalúa
 // antes de intentar el login.

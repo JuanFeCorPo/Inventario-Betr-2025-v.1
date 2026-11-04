@@ -15,6 +15,10 @@ export const FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT = 6;
 
 // Categorías con especificaciones técnicas (componentes) editables
 export const CATEGORIAS_CON_ESPECIFICACIONES = ['Laptops', 'CPU'];
+
+// Categorías con casilla "Cargador" (Nº de inventario del cargador del portátil).
+// El cargador no es un equipo aparte: va anotado en su portátil.
+export const CATEGORIAS_CON_CARGADOR = ['Laptops'];
 export const CAMPOS_ESPECIFICACIONES = [
   { key: 'marca',            label: 'Marca' },
   { key: 'modelo',           label: 'Modelo' },
@@ -53,5 +57,8 @@ export const STATUS_ORDER = ['Disponible', 'En Uso', 'En Mantenimiento', 'Fuera 
 
 // Logo propio (public/): antes se descargaba de un sitio externo en cada visita y el login dependía de él
 export const LOGO_URL = '/logo-betrmedia.png';
+
+// Canal de soporte de T.I. que se muestra cuando alguien no puede entrar.
+export const SUPPORT_EMAIL = 'sistemas@betrmedia.com';
 export const IDLE_TIME_MS    = 900_000;   // 15 minutos
 export const IDLE_WARNING_MS = 40_000;    // aviso 40 s antes del cierre
