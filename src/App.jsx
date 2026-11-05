@@ -18,6 +18,38 @@ import StaffApp           from './screens/StaffApp';
 import { Spinner } from './components/ui';
 import ConfigErrorScreen  from './screens/ConfigErrorScreen';
 
+// ── Entrada directa desde BETR People Center ──────────────────────────────────
+// El menú de BETR PC abre /?entrar=google&correo=persona@betrmedia.com. Si aquí no hay
+// sesión, se va directo a Google con esa cuenta ya escogida: como la persona acaba de
+// entrar a BETR PC con ella, Google la devuelve sin pedir nada. Las reglas de acceso
+// (accessForUnregistered y firestore.rules) no cambian: sigue siendo un ingreso con Google.
+// Los parámetros se quitan de la dirección y un intento fallido no se repite en 2 minutos.
+const CLAVE_ENTRADA = 'betr-entrada-directa';
+function leerEntradaDirecta() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('entrar') !== 'google') return null;
+    const correo = (url.searchParams.get('correo') || '').trim().toLowerCase();
+    url.searchParams.delete('entrar');
+    url.searchParams.delete('correo');
+    window.history.replaceState(null, '', url.pathname + (url.search || '') + url.hash);
+    return isCompanyEmail(correo) ? correo : null;
+  } catch { return null; }
+}
+const ENTRADA_DIRECTA = typeof window !== 'undefined' ? leerEntradaDirecta() : null;
+const intentoReciente = () => {
+  try { return Date.now() - Number(sessionStorage.getItem(CLAVE_ENTRADA) || 0) < 120000; } catch { return true; }
+};
+const marcarIntento = () => { try { sessionStorage.setItem(CLAVE_ENTRADA, String(Date.now())); } catch { /* sin almacenamiento */ } };
+
+function proveedorGoogle(correo) {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters(correo
+    ? { hd: COMPANY_DOMAIN, login_hint: correo }
+    : { hd: COMPANY_DOMAIN, prompt: 'select_account' });
+  return provider;
+}
+
 export default function App() {
   const [user,     setUser]     = useState(null);
   const [loading,  setLoading]  = useState(true);
@@ -87,6 +119,17 @@ export default function App() {
           }
         }
       } else {
+        // Viene de BETR PC y no hay sesión: directo a Google con su cuenta (sin pantalla de login).
+        if (ENTRADA_DIRECTA && !intentoReciente()) {
+          marcarIntento();
+          try {
+            await setPersistence(auth, browserSessionPersistence);
+            await signInWithRedirect(auth, proveedorGoogle(ENTRADA_DIRECTA));
+            return; // la página se va a Google; el cargador sigue visible
+          } catch (e) {
+            console.error('No se pudo iniciar la entrada directa:', e);
+          }
+        }
         setUser(null);
       }
       setLoading(false);
@@ -133,8 +176,8 @@ export default function App() {
     setAuthError(null);
     setAuthNotice('');
     await setPersistence(auth, browserSessionPersistence);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ hd: COMPANY_DOMAIN, prompt: 'select_account' });
+    // Si vino de BETR PC, el botón también sugiere esa cuenta
+    const provider = proveedorGoogle(ENTRADA_DIRECTA);
     const sinVentanas = window.matchMedia?.('(display-mode: standalone)').matches
       || /FBAN|FBAV|Instagram|Line\/|Slack|; wv\)/i.test(navigator.userAgent);
     if (sinVentanas) return signInWithRedirect(auth, provider);
