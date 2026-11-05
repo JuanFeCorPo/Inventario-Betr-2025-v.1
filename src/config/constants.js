@@ -60,5 +60,5 @@ export const LOGO_URL = '/logo-betrmedia.png';
 
 // Canal de soporte de T.I. que se muestra cuando alguien no puede entrar.
 export const SUPPORT_EMAIL = 'sistemas@betrmedia.com';
-export const IDLE_TIME_MS    = 900_000;   // 15 minutos
+export const IDLE_TIME_MS    = 8 * 60 * 60 * 1000;   // 8 horas (jornada completa)
 export const IDLE_WARNING_MS = 40_000;    // aviso 40 s antes del cierre
