@@ -123,19 +123,6 @@ const useInventory = (db, user) => {
     await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
   };
 
-  // ── Registrar mantenimiento preventivo realizado ──
-  const registerMaintenance = async (id, fecha, notas) => {
-    const ref             = doc(db, EQUIPOS_PATH, id);
-    const fechaTimestamp  = Timestamp.fromDate(new Date(fecha));
-    await updateDoc(ref, { ultimoMantenimiento: fechaTimestamp });
-    const entry = {
-      timestamp: Timestamp.now(),
-      user: user.email,
-      action: `Mantenimiento preventivo realizado.${notas?.trim() ? `\n${notas.trim()}` : ''}`,
-    };
-    await addDoc(collection(db, EQUIPOS_PATH, id, HISTORIAL), entry);
-  };
-
   // ── Registrar en la hoja de vida del equipo (F-MAN-03) ──
   // Mantenimiento, novedad o nota con fecha propia. Se guarda con campos
   // (tipo, fecha, descripción…) para armar el formato, y con `action` para la trazabilidad.
@@ -222,7 +209,7 @@ const useInventory = (db, user) => {
     await deleteDoc(doc(db, EQUIPOS_ELIMINADOS_PATH, backup.tombstoneId));
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registerMaintenance, registrarEvento };
+  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registrarEvento };
 };
 
 export default useInventory;

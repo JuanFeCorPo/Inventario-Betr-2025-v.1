@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance, getUpcomingMaintenance, summarizeOverdue } from './maintenance';
+import { getMaintenanceInfo, groupMaintenanceByUrgency, countOverdueMaintenance, getUpcomingMaintenance, summarizeOverdue, proximoTrasRegistrar } from './maintenance';
 
 const ts = (date) => ({ toDate: () => date });
 const daysAgo = (n) => ts(new Date(Date.now() - n * 86_400_000));
@@ -171,5 +171,16 @@ describe('summarizeOverdue', () => {
   it('sin vencidos devuelve ceros', () => {
     expect(summarizeOverdue([conVencimiento(hoy, -10)], hoy)).toEqual({ vencidos: 0, masAntiguoDias: 0 });
     expect(summarizeOverdue([], hoy)).toEqual({ vencidos: 0, masAntiguoDias: 0 });
+  });
+});
+
+describe('proximoTrasRegistrar', () => {
+  it('suma la frecuencia a la fecha registrada (mediodía local, sin correrse un día)', () => {
+    const p = proximoTrasRegistrar({ frecuenciaMantenimientoMeses: 6 }, '2026-03-10');
+    expect([p.getFullYear(), p.getMonth(), p.getDate()]).toEqual([2026, 8, 10]);
+  });
+  it('si ya había uno más reciente, no lo mueve atrás', () => {
+    const p = proximoTrasRegistrar({ ultimoMantenimiento: ts(new Date(2026, 4, 1, 12)) }, '2026-01-15');
+    expect([p.getFullYear(), p.getMonth(), p.getDate()]).toEqual([2026, 10, 1]);
   });
 });

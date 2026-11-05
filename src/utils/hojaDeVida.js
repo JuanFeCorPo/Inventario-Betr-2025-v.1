@@ -10,7 +10,7 @@
 //  El Excel se llena sobre la plantilla real (utils/hojaDeVidaExport.js).
 // ─────────────────────────────────────────────
 
-import { CASILLAS, casillaDe, casillaPorTexto, serialLimpio } from './puestos';
+import { CASILLAS, casillaDe, casillaPorTexto, serialLimpio, recientesPrimero } from './puestos';
 import { formatFecha } from './format';
 
 export const VERSION_FORMATO = '03';
@@ -18,7 +18,6 @@ const NO_APLICA = 'NO APLICA';
 
 const fechaDe = (v) => (v?.toDate ? v.toDate() : v instanceof Date ? v : null);
 const texto = (v) => String(v ?? '').trim();
-const porFecha = (a, b) => (a.fecha?.getTime() ?? 0) - (b.fecha?.getTime() ?? 0);
 const codigoEn = (s) => {
   const m = String(s ?? '').toUpperCase().match(/BM\s?-?\s?INV\s?-?\s?(\d{3,4})/);
   return m ? `BM-INV-${m[1].padStart(4, '0')}` : null;
@@ -37,7 +36,7 @@ export function entradasDeEquipo(historial = []) {
   return historial.flatMap((h) => {
     if (h.tipo) {
       return [{
-        fecha: fechaDe(h.fecha) ?? fechaDe(h.timestamp), tipo: h.tipo,
+        fecha: fechaDe(h.fecha) ?? fechaDe(h.timestamp), timestamp: h.timestamp, tipo: h.tipo,
         descripcion: texto(h.descripcion), responsable: texto(h.responsable ?? h.user), reporta: texto(h.reporta),
       }];
     }
@@ -51,8 +50,8 @@ export function entradasDeEquipo(historial = []) {
       const resto = action.split('\n').slice(1).join(' ').trim();
       descripcion = resto || (tipo === 'preventivo' ? 'Mantenimiento preventivo realizado.' : 'Mantenimiento correctivo.');
     }
-    return [{ fecha: fechaDe(h.timestamp), tipo, descripcion: descripcion.replace(/\s*\n\s*/g, ' '), responsable: texto(h.user), reporta: '' }];
-  }).sort(porFecha);
+    return [{ fecha: fechaDe(h.timestamp), timestamp: h.timestamp, tipo, descripcion: descripcion.replace(/\s*\n\s*/g, ' '), responsable: texto(h.user), reporta: '' }];
+  }).sort((a, b) => recientesPrimero(b, a)); // de la más antigua a la más reciente
 }
 
 // ── Componentes que salieron del puesto (van tachados en su columna) ──
@@ -121,9 +120,9 @@ export function datosHojaPuesto({ puesto, equipos = [], principal = null, histor
   }
 
   const entradas = historial
-    .map(h => ({ fecha: fechaDe(h.fecha), tipo: h.tipo, descripcion: texto(h.descripcion), responsable: texto(h.responsable), reporta: texto(h.reporta) }))
+    .map(h => ({ fecha: fechaDe(h.fecha), timestamp: h.timestamp, tipo: h.tipo, descripcion: texto(h.descripcion), responsable: texto(h.responsable), reporta: texto(h.reporta) }))
     .filter(h => h.descripcion && !ES_DEL_SISTEMA.test(h.descripcion))
-    .sort(porFecha);
+    .sort((a, b) => recientesPrimero(b, a)); // la hoja va de la más antigua a la más reciente
 
   const o = (v) => texto(v) || NO_APLICA;
   return {

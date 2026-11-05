@@ -100,3 +100,15 @@ export function summarizeOverdue(items, now = new Date()) {
   });
   return { vencidos, masAntiguoDias };
 }
+
+// Próximo mantenimiento después de registrar uno con fecha `fechaIso` (AAAA-MM-DD).
+// Si el equipo ya tenía uno más reciente, ese manda (el registro no lo mueve atrás).
+export function proximoTrasRegistrar(item, fechaIso) {
+  const [y, m, d] = fechaIso.split('-').map(Number);
+  const nueva = new Date(y, m - 1, d, 12);
+  const previa = toDate(item?.ultimoMantenimiento);
+  const base = previa && previa > nueva ? previa : nueva;
+  const proxima = new Date(base);
+  proxima.setMonth(proxima.getMonth() + (item?.frecuenciaMantenimientoMeses ?? FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT));
+  return proxima;
+}

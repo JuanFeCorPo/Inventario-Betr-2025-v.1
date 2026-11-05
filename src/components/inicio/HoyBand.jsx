@@ -11,7 +11,7 @@ import { Skeleton, Spinner } from '../ui';
 import { useTicketsTI } from '../../hooks/useTickets';
 import usePuestos from '../../hooks/usePuestos';
 import { tituloTicket, ordenarTickets, haceCuanto, estaAbierto } from '../../utils/tickets';
-import { equiposDelPuesto, resumenPuesto, etiquetaCasilla } from '../../utils/puestos';
+import { equiposDelPuesto, resumenPuesto, etiquetaCasilla, ubicacionEquipo } from '../../utils/puestos';
 import { getMaintenanceInfo } from '../../utils/maintenance';
 import { EstadoTicket } from '../tickets/TicketUI';
 
@@ -56,19 +56,26 @@ const Fila = ({ onClick, children, label }) => (
 
 // Mantenimientos vencidos de CPU y portátiles, agrupados por puesto (o por encargado si no tiene).
 const vencidosPorPuesto = (items, puestos) => {
-  const nombre = new Map(puestos.map(p => [p.id, p.nombre]));
+  const porId = new Map(puestos.map(p => [p.id, p]));
   const grupos = new Map();
   for (const item of items) {
     const info = getMaintenanceInfo(item);
     if (info?.urgencia !== 'vencido') continue;
-    const enc = item.personaEncargada || 'Sin encargado';
-    const clave = item.puestoId && nombre.has(item.puestoId) ? nombre.get(item.puestoId) : /^betrmedia$/i.test(enc.trim()) ? 'En stock (Betrmedia)' : enc;
-    const g = grupos.get(clave) ?? { clave, equipos: [], dias: 0 };
+    const u = ubicacionEquipo(item, porId);
+    const clave = u.titulo;
+    const g = grupos.get(clave) ?? { clave, puesto: u.puesto, equipos: [], dias: 0 };
     g.equipos.push(item);
     g.dias = Math.max(g.dias, -info.diasRestantes);
     grupos.set(clave, g);
   }
   return [...grupos.values()].sort((a, b) => b.dias - a.dias);
+};
+
+// "en 3 puestos · 1 en stock"
+const detalleVencidos = (vencidos) => {
+  const enPuesto = vencidos.filter(g => g.puesto).length;
+  const otros = vencidos.length - enPuesto;
+  return [enPuesto && `en ${enPuesto} puesto${enPuesto === 1 ? '' : 's'}`, otros && `${otros} sin puesto`].filter(Boolean).join(' · ');
 };
 
 const HoyBand = ({ db, user, items, loading, onNavigate }) => {
@@ -154,12 +161,13 @@ const HoyBand = ({ db, user, items, loading, onNavigate }) => {
       </Bloque>
 
       <Bloque id="hoy-mantenimientos" titulo="Mantenimientos vencidos" icon={Wrench} total={totalVencidos}
-        detalle={loading ? 'Cargando…' : totalVencidos === 0 ? 'Al día' : `en ${vencidos.length} puesto${vencidos.length === 1 ? '' : 's'} o encargado${vencidos.length === 1 ? '' : 's'}`}
+        detalle={loading ? 'Cargando…' : totalVencidos === 0 ? 'Al día' : detalleVencidos(vencidos)}
         accion="Ver mantenimientos" onAccion={() => onNavigate('maintenance')}>
         {loading ? <Cargando /> : totalVencidos === 0 ? <Calma texto="Ningún mantenimiento vencido." /> : (
           <ul className="divide-y divide-brand-border border-t border-brand-border">
             {vencidos.slice(0, 3).map(g => (
-              <Fila key={g.clave} onClick={() => onNavigate('maintenance')} label={`${g.clave}: ${g.equipos.length} vencido${g.equipos.length === 1 ? '' : 's'}`}>
+              <Fila key={g.clave} onClick={() => (g.puesto ? onNavigate('puestos', { puestoId: g.puesto.id }) : onNavigate('maintenance'))}
+                label={`${g.clave}: ${g.equipos.length} vencido${g.equipos.length === 1 ? '' : 's'}, el más antiguo hace ${g.dias} días (${g.equipos.map(e => e.numeroInventario || e.nombre).join(', ')}). ${g.puesto ? 'Abrir hoja de vida' : 'Ver mantenimientos'}`}>
                 <span className="w-2 h-2 rounded-full bg-rose-600 flex-shrink-0" aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium text-brand-ink truncate">{g.clave}</span>

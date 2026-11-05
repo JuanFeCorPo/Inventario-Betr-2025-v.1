@@ -3,7 +3,7 @@ import { Plus, Trash2, Search, ArrowRight, AlertTriangle, MoveRight, Users as Us
 import { Modal, Button, Field, FormActions, Spinner, StatusDot } from '../ui';
 import { fieldClass } from '../ui/fieldClasses';
 import useAsyncAction from '../../hooks/useAsyncAction';
-import { hoyLocal } from '../../utils/format';
+import { hoyLocal, formatFecha } from '../../utils/format';
 import { CATEGORY_ICONS } from '../../config/categoryIcons';
 import {
   AREAS, TIPOS_EVENTO, correoValido, etiquetaEquipo, etiquetaCasilla, casillaDe,
@@ -564,6 +564,94 @@ export const EventoModal = ({ isOpen, onClose, onConfirm, tipoInicial = 'prevent
         <FormActions error={error}>
           <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
           <SaveButton busy={busy}>Guardar en la hoja de vida</SaveButton>
+        </FormActions>
+      </form>
+    </Modal>
+  );
+};
+
+// ── Registrar mantenimiento preventivo (un solo propósito) ──
+// Se abre desde la franja de la hoja de vida y desde el tablero de Mantenimientos.
+// Dice qué equipo es (puesto + Nº), trae los trabajos de siempre como botones y
+// la nota es opcional: lo normal es fecha de hoy + un toque.
+const TRABAJOS_PREVENTIVO = ['Limpieza interna', 'Cambio de pasta térmica', 'Actualizaciones', 'Revisión general'];
+const descripcionMantenimiento = (trabajos, nota) => {
+  const base = trabajos.length ? `${trabajos.join(', ')}.` : '';
+  const extra = nota.trim();
+  return [base, extra].filter(Boolean).join(' ') || 'Mantenimiento preventivo general.';
+};
+
+export const MantenimientoModal = ({ isOpen, onClose, onConfirm, equipo, ubicacion, proximaFecha, conPuesto = false }) => {
+  const [fecha, setFecha] = useState('');
+  const [trabajos, setTrabajos] = useState([]);
+  const [nota, setNota] = useState('');
+  const [fechaError, setFechaError] = useState('');
+  const { busy, error, run, reset } = useAsyncAction();
+  // Conserva el último equipo para que la salida animada tenga contenido
+  const [ultimo, setUltimo] = useState(null);
+  useEffect(() => { if (equipo) setUltimo({ equipo, ubicacion, proximaFecha, conPuesto }); }, [equipo, ubicacion, proximaFecha, conPuesto]);
+  const ver = equipo ? { equipo, ubicacion, proximaFecha, conPuesto } : ultimo;
+
+  useEffect(() => {
+    if (isOpen) { setFecha(hoyLocal()); setTrabajos([]); setNota(''); setFechaError(''); reset(); }
+  }, [isOpen, reset]);
+
+  const alternar = (t) => setTrabajos(p => (p.includes(t) ? p.filter(x => x !== t) : [...p, t]));
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!fecha) { setFechaError('Elige la fecha del mantenimiento.'); return; }
+    if (fecha > hoyLocal()) { setFechaError('La fecha no puede ser futura.'); return; }
+    setFechaError('');
+    run(() => onConfirm({ tipo: 'preventivo', fecha, descripcion: descripcionMantenimiento(trabajos, nota) }),
+      'No se pudo registrar el mantenimiento. Revisa tu conexión e inténtalo de nuevo.');
+  };
+
+  const eq = ver?.equipo;
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Registrar mantenimiento" size="sm">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        {eq && (
+          <div className="flex items-center gap-3 rounded-xl border border-brand-border bg-brand-bg/60 px-3.5 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-brand-ink truncate">{ver.ubicacion || eq.nombre}</p>
+              <p className="text-xs text-brand-gray truncate">
+                {eq.categoria === 'Laptops' ? 'Portátil' : 'CPU'} · <span className="font-mono">{eq.numeroInventario}</span>
+                {ver.proximaFecha && <> · tocaba el {formatFecha(ver.proximaFecha)}</>}
+              </p>
+            </div>
+          </div>
+        )}
+        <Field label="Fecha del mantenimiento" required error={fechaError}>
+          <input type="date" value={fecha} max={hoyLocal()} onChange={e => { setFecha(e.target.value); setFechaError(''); }}
+            aria-required="true" aria-invalid={!!fechaError} className={fieldClass} />
+        </Field>
+        <fieldset>
+          <legend className="text-xs font-semibold text-brand-slate mb-1.5">Qué se hizo <span className="font-normal text-brand-gray">(opcional)</span></legend>
+          <div className="flex flex-wrap gap-2">
+            {TRABAJOS_PREVENTIVO.map(t => {
+              const activo = trabajos.includes(t);
+              return (
+                <button key={t} type="button" aria-pressed={activo} onClick={() => alternar(t)}
+                  className={`h-9 px-3 rounded-xl text-sm transition ${activo ? 'vidrio-tinta font-medium' : 'vidrio text-brand-slate hover:text-brand-ink'}`}>
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+        <Field label="Nota (opcional)">
+          <textarea value={nota} onChange={e => setNota(e.target.value)} rows={2}
+            placeholder="Ej: se cambió el ventilador del procesador" className={`${fieldClass} resize-none`} />
+        </Field>
+        {eq && (
+          <p className="text-xs text-brand-gray">
+            {ver.conPuesto ? 'Queda en la hoja de vida del puesto y en la de' : 'Queda en la hoja de vida de'} <span className="font-medium text-brand-slate">{etiquetaEquipo(eq)}</span>, y actualiza su próximo mantenimiento.
+          </p>
+        )}
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <SaveButton busy={busy}>Registrar mantenimiento</SaveButton>
         </FormActions>
       </form>
     </Modal>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   equiposDelPuesto, equipoPrincipal, ordenarPuestos, buscarEquiposAsignables,
-  etiquetaEquipo, limpiarPersonas, correoValido,
+  etiquetaEquipo, limpiarPersonas, correoValido, ubicacionEquipo, EN_STOCK, recientesPrimero,
 } from './puestos';
 
 const eq = (id, categoria, extra = {}) => ({ id, categoria, nombre: `${categoria} ${id}`, numeroInventario: `BM-INV-${id}`, estado: 'En Uso', ...extra });
@@ -138,5 +138,31 @@ describe('candidatosParaCasilla', () => {
   it('busca y puede quitar el filtro por tipo', () => {
     expect(candidatosParaCasilla(items, { casilla: 'monitor', puestoId: 'p1', term: 'samsung' }).total).toBe(1);
     expect(candidatosParaCasilla(items, { casilla: 'monitor', puestoId: 'p1', todos: true }).disponibles.map(i => i.id)).toEqual(['1', '3']);
+  });
+});
+
+describe('ubicacionEquipo', () => {
+  const p1 = { id: 'p1', nombre: 'Optimización #1', area: 'Operaciones', hojaOriginal: '1. Hoja de Vida - Equipos de Optimización/EQUIPO #1.xlsx' };
+  const mapa = new Map([[p1.id, p1]]);
+  it('nombra por el puesto y agrupa por su equipo de trabajo', () => {
+    const u = ubicacionEquipo({ puestoId: 'p1' }, mapa);
+    expect(u.titulo).toBe('Optimización #1');
+    expect(u.puesto).toBe(p1);
+    expect(u.grupo).not.toBe('Sin puesto');
+  });
+  it('sin puesto: por el encargado, o en stock si es Betrmedia o vacío', () => {
+    expect(ubicacionEquipo({ personaEncargada: 'Mary Paez' }, mapa)).toMatchObject({ titulo: 'Mary Paez', grupo: 'Sin puesto', puesto: null });
+    expect(ubicacionEquipo({ personaEncargada: 'BETRMEDIA' }, mapa).titulo).toBe(EN_STOCK);
+    expect(ubicacionEquipo({ puestoId: 'borrado' }, mapa).titulo).toBe(EN_STOCK);
+  });
+});
+
+describe('recientesPrimero', () => {
+  const t = (d) => ({ toDate: () => d, toMillis: () => d.getTime() });
+  it('el mismo día manda la hora de registro, no la hora de la fecha', () => {
+    const cambio = { id: 'cambio', fecha: t(new Date(2026, 10, 5, 15)), timestamp: t(new Date(2026, 10, 5, 15)) };
+    const mant = { id: 'mant', fecha: t(new Date(2026, 10, 5, 12)), timestamp: t(new Date(2026, 10, 5, 16)) };
+    const viejo = { id: 'viejo', fecha: t(new Date(2026, 10, 4, 12)), timestamp: t(new Date(2026, 10, 5, 17)) };
+    expect([viejo, cambio, mant].sort(recientesPrimero).map(x => x.id)).toEqual(['mant', 'cambio', 'viejo']);
   });
 });

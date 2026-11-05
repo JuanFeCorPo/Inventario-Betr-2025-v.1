@@ -9,7 +9,7 @@ import {
   collection, doc, onSnapshot, query, Timestamp, writeBatch, deleteField,
 } from 'firebase/firestore';
 import { PUESTOS_PATH, EQUIPOS_PATH } from '../config/firebase';
-import { etiquetaEquipo, limpiarPersonas, casillaDe } from '../utils/puestos';
+import { etiquetaEquipo, limpiarPersonas, casillaDe, recientesPrimero } from '../utils/puestos';
 
 const HISTORIAL = 'historial';
 // Encargado que queda en el inventario cuando un equipo sale de un puesto
@@ -296,8 +296,7 @@ export const usePuestoHistorial = (db, puestoId) => {
     const unsub = onSnapshot(collection(db, PUESTOS_PATH, puestoId, HISTORIAL),
       snap => {
         const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rows.sort((a, b) => (b.fecha?.toMillis?.() ?? 0) - (a.fecha?.toMillis?.() ?? 0)
-          || (b.timestamp?.toMillis?.() ?? 0) - (a.timestamp?.toMillis?.() ?? 0));
+        rows.sort(recientesPrimero);
         setHistorial(rows);
         setLoading(false);
       },

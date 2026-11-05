@@ -46,8 +46,9 @@ const FilaPuesto = ({ puesto, equipos, onOpen }) => {
   const personas = (puesto.personas ?? []).map(p => p.nombre || p.correo).join(', ');
   const estado = r.conFalla > 0
     ? { txt: `${r.conFalla} con falla`, cls: 'text-rose-700 font-semibold', icon: true }
-    : r.vencido ? { txt: 'Mant. vencido', cls: 'text-rose-700 font-medium' }
-      : r.faltan.length ? { txt: `Falta ${r.faltan.map(k => etiquetaCasilla(k).toLowerCase().replace('cpu / portátil', 'CPU')).join(', ')}`, cls: 'text-amber-800' }
+    // Mismo orden que resumenPuesto (y que Inicio): falla > falta algo > mantenimiento vencido
+    : r.faltan.length ? { txt: `Falta ${r.faltan.map(k => etiquetaCasilla(k).toLowerCase().replace('cpu / portátil', 'CPU')).join(', ')}`, cls: 'text-amber-800' }
+      : r.vencido ? { txt: 'Mant. vencido', cls: 'text-rose-700 font-medium' }
         : r.mant ? { txt: `Mant. ${formatFecha(r.mant.proximaFecha)}`, cls: 'text-brand-gray' }
           : { txt: equipos.length ? `${equipos.length} equipos` : 'Puesto vacío', cls: 'text-brand-gray' };
 

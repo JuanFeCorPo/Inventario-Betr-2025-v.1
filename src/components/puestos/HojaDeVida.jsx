@@ -6,12 +6,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Pencil, ClipboardPlus, Plus, Repeat2, LogOut as SalirIcon, Loader2, History,
-  MoreHorizontal, MoveRight, MoreVertical, FileSpreadsheet, FileText,
+  MoreHorizontal, MoveRight, MoreVertical, FileSpreadsheet, FileText, Wrench, CheckCircle2,
 } from 'lucide-react';
 import { EmptyState, StatusDot, ToastHost } from '../ui';
 import { CAMPOS_ESPECIFICACIONES } from '../../config/constants';
 import { formatFecha } from '../../utils/format';
-import { getMaintenanceInfo } from '../../utils/maintenance';
+import { getMaintenanceInfo, proximoTrasRegistrar } from '../../utils/maintenance';
 import {
   CASILLAS, TIPOS_EVENTO, equipoPrincipal, etiquetaEquipo, equiposPorCasilla, grupoDe, SIN_GRUPO, serialLimpio,
 } from '../../utils/puestos';
@@ -20,7 +20,7 @@ import { usePuestoHistorial } from '../../hooks/usePuestos';
 import { usePopover } from '../../hooks/usePopover';
 import useToast from '../../hooks/useToast';
 import { iconoCasilla } from './casillaIcons';
-import { PuestoFormModal, CasillaPickerModal, TrasladarModal, RetirarModal, EventoModal, EliminarPuestoModal } from './PuestoModals';
+import { PuestoFormModal, CasillaPickerModal, TrasladarModal, RetirarModal, EventoModal, EliminarPuestoModal, MantenimientoModal } from './PuestoModals';
 import DescargarHoja from './DescargarHoja';
 import useDescargasHoja from '../../hooks/useDescargasHoja';
 
@@ -162,6 +162,75 @@ const CASILLA_DE_LINEA = { audifonos: 'audifonos', 'audífonos': 'audifonos', ac
 // Notas automáticas que no aportan en pantalla (siguen guardadas)
 const ES_NOTA_DEL_SISTEMA = /^Puesto importado de la hoja de vida en Excel.$/;
 
+// ── Franja de mantenimiento preventivo ──
+// Arriba de Componentes: si un CPU o portátil del puesto está vencido (o vence
+// esta semana) lo dice en grande con el botón para registrarlo; si todo está
+// al día, una línea discreta. Revisa todos los equipos, no solo el primero.
+const plural = (n, s) => `${n} ${s}${n === 1 ? '' : 's'}`;
+const tituloMant = (d) => (d < 0 ? `Mantenimiento vencido hace ${plural(-d, 'día')}`
+  : d === 0 ? 'El mantenimiento vence hoy' : `El mantenimiento vence en ${plural(d, 'día')}`);
+const tipoCorto = (e) => (e.categoria === 'Laptops' ? 'Portátil' : 'CPU');
+
+const FranjaMantenimiento = ({ equipos, isAdmin, onRegistrar }) => {
+  const lista = equipos
+    .map(e => ({ e, info: getMaintenanceInfo(e) }))
+    .filter(x => x.info)
+    .sort((a, b) => a.info.diasRestantes - b.info.diasRestantes);
+  if (!lista.length) return null;
+  const urgentes = lista.filter(x => x.info.diasRestantes <= 7);
+
+  if (!urgentes.length) {
+    const { e, info } = lista[0];
+    return (
+      <div className="flex items-center gap-3 bg-white border border-brand-border rounded-2xl shadow-card px-4 py-3">
+        <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" aria-hidden="true" />
+        <p className="min-w-0 flex-1 text-sm text-brand-slate">
+          <span className="font-semibold text-brand-ink">Mantenimiento al día</span>
+          <span className="text-brand-gray"> · próximo {formatFecha(info.proximaFecha)} · {tipoCorto(e)} <span className="font-mono">{e.numeroInventario}</span></span>
+        </p>
+        {isAdmin && (
+          <button type="button" onClick={() => onRegistrar(e, info)}
+            className="hidden sm:flex items-center gap-1.5 vidrio text-brand-slate hover:text-brand-ink text-sm px-3 h-9 rounded-xl transition flex-shrink-0">
+            <Wrench size={14} aria-hidden="true" /> Registrar
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const vencido = urgentes.some(x => x.info.diasRestantes < 0);
+  const tono = vencido
+    ? { caja: 'bg-rose-50 border-rose-200', icono: 'bg-rose-600 text-white', titulo: 'text-rose-800', linea: 'divide-rose-200' }
+    : { caja: 'bg-amber-50 border-amber-200', icono: 'bg-amber-400 text-brand-ink', titulo: 'text-amber-900', linea: 'divide-amber-200' };
+  return (
+    <section aria-label="Mantenimiento preventivo" className={`border rounded-2xl ${tono.caja}`}>
+      <ul className={`divide-y ${tono.linea}`}>
+        {urgentes.map(({ e, info }) => (
+          <li key={e.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3.5 gap-y-3 px-4 py-3.5">
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tono.icono}`} aria-hidden="true">
+              <Wrench size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-semibold ${tono.titulo}`}>{tituloMant(info.diasRestantes)}</p>
+              <p className="text-xs text-brand-slate mt-0.5">
+                {tipoCorto(e)} <span className="font-mono">{e.numeroInventario}</span>
+                {' · '}{e.ultimoMantenimiento ? `último ${formatFecha(info.ultimaFecha)}` : 'sin mantenimientos registrados'}
+                {' · '}cada {info.frecuenciaMeses} {info.frecuenciaMeses === 1 ? 'mes' : 'meses'}
+              </p>
+            </div>
+            {isAdmin && (
+              <button type="button" onClick={() => onRegistrar(e, info)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 vidrio-naranja text-sm font-semibold px-4 h-10 rounded-xl transition flex-shrink-0">
+                <Wrench size={15} aria-hidden="true" /> Registrar mantenimiento
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
 const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onBack, onEliminado }) => {
   const { historial, loading: loadingHist } = usePuestoHistorial(db, puesto.id);
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
@@ -172,6 +241,7 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
 
   const [editOpen, setEditOpen] = useState(false);
   const [eventoOpen, setEventoOpen] = useState(false);
+  const [mantenimiento, setMantenimiento] = useState(null); // { equipo, info }
   const [picker, setPicker] = useState({ open: false, casilla: null, viejo: null });
   const [traslado, setTraslado] = useState(null);
   const [retirar, setRetirar] = useState(null);
@@ -218,6 +288,12 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
 
   const handleSave = async (data) => { await actions.savePuesto(data, equipos); setEditOpen(false); showToast('Puesto guardado'); };
   const handleEvento = async (ev) => { await actions.registrarEvento(puesto, ev, principal); setEventoOpen(false); showToast('Guardado en la hoja de vida'); };
+  const handleMantenimiento = async (ev) => {
+    const { equipo } = mantenimiento;
+    await actions.registrarEvento(puesto, ev, equipo);
+    setMantenimiento(null);
+    showToast(`Mantenimiento registrado · próximo ${formatFecha(proximoTrasRegistrar(equipo, ev.fecha))}`);
+  };
   const handlePick = async (equipo, opts, origen) => {
     let deshacer;
     if (picker.viejo) {
@@ -288,6 +364,8 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_380px] gap-4 2xl:gap-5 items-start">
         <div className="space-y-4 2xl:space-y-5 min-w-0">
+          <FranjaMantenimiento equipos={equipos} isAdmin={isAdmin} onRegistrar={(equipo, info) => setMantenimiento({ equipo, info })} />
+
           {/* Componentes: las casillas del F-MAN-02 */}
           <Card title={`Componentes · ${equipos.length} equipo${equipos.length === 1 ? '' : 's'}`}>
             {vacio && (
@@ -404,6 +482,8 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
         onEliminar={() => { setEditOpen(false); setEliminarOpen(true); }} />
       <EliminarPuestoModal isOpen={eliminarOpen} onClose={() => setEliminarOpen(false)} puesto={puesto} equipos={equipos} onConfirm={handleEliminar} />
       <EventoModal isOpen={eventoOpen} onClose={() => setEventoOpen(false)} onConfirm={handleEvento} principal={principal} />
+      <MantenimientoModal isOpen={!!mantenimiento} onClose={() => setMantenimiento(null)} onConfirm={handleMantenimiento}
+        equipo={mantenimiento?.equipo} ubicacion={puesto.nombre} proximaFecha={mantenimiento?.info.proximaFecha} conPuesto />
       <CasillaPickerModal isOpen={picker.open} onClose={() => setPicker(p => ({ ...p, open: false }))}
         items={items} puestos={puestos} puesto={puesto} casilla={picker.casilla} viejo={picker.viejo} onConfirm={handlePick} />
       <TrasladarModal isOpen={!!traslado} onClose={() => setTraslado(null)} equipo={traslado} origen={puesto}

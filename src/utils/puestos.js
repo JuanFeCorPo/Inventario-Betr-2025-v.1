@@ -232,3 +232,30 @@ export const limpiarPersonas = (personas = []) =>
     .filter(p => p.nombre || p.correo);
 
 export const correoValido = (c) => !c || /^\S+@\S+\.\S+$/.test(c);
+
+// ── Dónde está un equipo, para nombrarlo en listas ──
+// "CPU" no dice nada: en Mantenimientos y en Hoy cada equipo se nombra por su
+// puesto ("Optimización #1"), o por el encargado si no tiene, o "En stock".
+// `grupo` es el equipo de trabajo del puesto, para agrupar las listas.
+export const EN_STOCK = 'En stock (Betrmedia)';
+export const ubicacionEquipo = (item, puestosPorId) => {
+  const puesto = item?.puestoId ? puestosPorId.get(item.puestoId) ?? null : null;
+  if (puesto) {
+    const g = grupoDe(puesto);
+    return { puesto, titulo: puesto.nombre, grupo: g.nombre === SIN_GRUPO ? (puesto.area ?? 'Otros') : g.nombre, orden: g.orden };
+  }
+  const enc = String(item?.personaEncargada ?? '').trim();
+  if (!enc || /^betrmedia$/i.test(enc)) return { puesto: null, titulo: EN_STOCK, grupo: 'En stock', orden: 1000 };
+  return { puesto: null, titulo: enc, grupo: 'Sin puesto', orden: 950 };
+};
+
+// ── Orden del historial ──
+// Por día (no por hora: los mantenimientos se guardan a mediodía y los cambios de
+// componentes con la hora real) y, el mismo día, el último registrado primero.
+const diaDe = (v) => {
+  const d = v?.toDate ? v.toDate() : v instanceof Date ? v : null;
+  return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() : 0;
+};
+const msDe = (v) => v?.toMillis?.() ?? (v instanceof Date ? v.getTime() : 0);
+export const recientesPrimero = (a, b) =>
+  diaDe(b.fecha) - diaDe(a.fecha) || msDe(b.timestamp) - msDe(a.timestamp) || msDe(b.fecha) - msDe(a.fecha);

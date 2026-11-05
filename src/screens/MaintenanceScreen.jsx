@@ -1,12 +1,21 @@
-import { useState, useMemo, useEffect } from 'react';
+// ─────────────────────────────────────────────
+//  Mantenimientos preventivos (CPU y portátiles), en 4 columnas por urgencia.
+//  Cada equipo se nombra por su puesto ("Optimización #1") con su Nº debajo,
+//  agrupado por equipo de trabajo: "CPU" a secas no dice cuál es.
+//  Registrar usa lo mismo que la hoja de vida: si el equipo está en un puesto,
+//  queda también en el historial del puesto (F-MAN-02).
+// ─────────────────────────────────────────────
+
+import { useState, useMemo } from 'react';
 import { ArrowLeft, CheckCircle2, Loader2, Laptop, Cpu } from 'lucide-react';
-import { Modal, Button, EmptyState, Field, FormActions, Spinner, ToastHost } from '../components/ui';
-import { formatFecha, hoyLocal } from '../utils/format';
-import { fieldClass } from '../components/ui/fieldClasses';
+import { EmptyState, ToastHost } from '../components/ui';
+import { formatFecha } from '../utils/format';
 import useInventory from '../hooks/useInventory';
-import useAsyncAction from '../hooks/useAsyncAction';
+import usePuestos from '../hooks/usePuestos';
 import useToast from '../hooks/useToast';
-import { groupMaintenanceByUrgency, GRUPOS_URGENCIA } from '../utils/maintenance';
+import { groupMaintenanceByUrgency, GRUPOS_URGENCIA, proximoTrasRegistrar } from '../utils/maintenance';
+import { ubicacionEquipo } from '../utils/puestos';
+import { MantenimientoModal } from '../components/puestos/PuestoModals';
 
 const URGENCIA_STYLES = {
   'vencido':     { dot: 'bg-rose-500',    text: 'text-rose-600' },
@@ -15,7 +24,7 @@ const URGENCIA_STYLES = {
   'proximo':     { dot: 'bg-emerald-500', text: 'text-emerald-600' },
 };
 
-// Texto corto para la línea compacta: "Hace 4 d", "Hoy", "12 d"
+// Texto corto para la línea: "Hace 4 d", "Hoy", "12 d" (el lector de pantalla oye el largo)
 const diasCorto = (dias) => {
   if (dias < 0) return `Hace ${Math.abs(dias)} d`;
   if (dias === 0) return 'Hoy';
@@ -28,115 +37,99 @@ const diasLargo = (dias) => {
   return `vence en ${dias} día${dias !== 1 ? 's' : ''}`;
 };
 
-const RegisterMaintenanceModal = ({ isOpen, onClose, onConfirm, itemName }) => {
-  const [fecha, setFecha] = useState('');
-  const [notas, setNotas] = useState('');
-  const [fechaError, setFechaError] = useState('');
-  const { busy, error, run, reset } = useAsyncAction();
+// En el grupo "En stock" todas dirían "En stock (Betrmedia)": ahí se nombra el equipo.
+const conTituloDeFila = (item, ubic) => (ubic.puesto || ubic.grupo !== 'En stock' ? ubic : { ...ubic, titulo: item.nombre || ubic.titulo });
 
-  useEffect(() => {
-    if (isOpen) { setFecha(hoyLocal()); setNotas(''); setFechaError(''); reset(); }
-  }, [isOpen, reset]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!fecha) { setFechaError('Elige la fecha del mantenimiento.'); return; }
-    if (fecha > hoyLocal()) { setFechaError('La fecha no puede ser futura.'); return; }
-    setFechaError('');
-    run(() => onConfirm(fecha, notas), 'No se pudo registrar el mantenimiento. Revisa tu conexión e inténtalo de nuevo.');
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Registrar mantenimiento" size="sm">
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <p className="text-brand-slate text-sm">
-          Equipo: <span className="font-semibold text-brand-ink">{itemName}</span>
-        </p>
-        <Field label="Fecha del mantenimiento" required error={fechaError}>
-          <input type="date" value={fecha} max={hoyLocal()} onChange={e => { setFecha(e.target.value); setFechaError(''); }}
-            autoFocus aria-required="true" aria-invalid={!!fechaError} className={fieldClass} />
-        </Field>
-        <Field label="Notas (opcional)">
-          <textarea value={notas} onChange={e => setNotas(e.target.value)}
-            placeholder="Ej: limpieza interna, cambio de pasta térmica…" className={`${fieldClass} h-24 resize-none`} />
-        </Field>
-        <FormActions error={error}>
-          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button variant="primary" type="submit" disabled={busy} className="flex items-center gap-2">
-            {busy && <Spinner size="sm" tone="dark" />}
-            {busy ? 'Guardando…' : 'Registrar'}
-          </Button>
-        </FormActions>
-      </form>
-    </Modal>
-  );
+// Agrupa las filas de una columna por equipo de trabajo, en el orden de urgencia
+// (el grupo con el equipo más urgente va primero).
+const porGrupo = (rows) => {
+  const m = new Map();
+  for (const r of rows) (m.get(r.ubic.grupo) ?? m.set(r.ubic.grupo, []).get(r.ubic.grupo)).push(r);
+  return [...m];
 };
 
-// Una columna por nivel de urgencia: total en grande y una línea por equipo.
-// El administrador toca la línea para registrar el mantenimiento.
 const UrgencyColumn = ({ group, isAdmin, onRegister }) => {
   const style = URGENCIA_STYLES[group.key];
   const { rows } = group;
+  const resumen = !rows[0] ? null
+    : group.key === 'vencido' ? `el más antiguo, ${diasLargo(rows[0].info.diasRestantes).replace('vencido ', '')}`
+      : `próximo ${formatFecha(rows[0].info.proximaFecha)}`;
   return (
-    <section className="bg-white border border-brand-border rounded-2xl shadow-card overflow-hidden">
+    <section aria-label={`${group.label}: ${rows.length}`} className="bg-white border border-brand-border rounded-2xl shadow-card overflow-hidden">
       <header className="px-4 pt-3 pb-2.5 border-b border-brand-border">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+          <span className={`w-2 h-2 rounded-full ${style.dot}`} aria-hidden="true" />
           <h2 className="text-xs font-semibold text-brand-slate uppercase tracking-wider">{group.label}</h2>
         </div>
         <div className="flex items-baseline justify-between gap-2 mt-1">
           <p className={`text-3xl font-bold tabular-nums leading-none ${rows.length ? style.text : 'text-brand-gray/40'}`}>{rows.length}</p>
-          {rows[0] && <p className="text-xs text-brand-gray">próximo {formatFecha(rows[0].info.proximaFecha)}</p>}
+          {resumen && <p className="text-xs text-brand-gray text-right">{resumen}</p>}
         </div>
       </header>
-      <ul className="py-1">
-        {rows.length === 0 && <li className="text-xs text-brand-gray text-center py-4">Nada aquí.</li>}
-        {rows.map(({ item, info }) => {
-          const Icon = item.categoria === 'CPU' ? Cpu : Laptop;
-          const tooltip = `${item.nombre} · Nº ${item.numeroInventario} · ${item.personaEncargada || 'Sin asignar'} — ${diasLargo(info.diasRestantes)} (${formatFecha(info.proximaFecha)})`;
-          const content = (
-            <>
-              <Icon size={13} className="text-brand-gray flex-shrink-0" />
-              <span className="text-[13px] text-brand-ink truncate flex-1">{item.nombre}</span>
-              <span className={`text-xs font-semibold tabular-nums whitespace-nowrap ${style.text}`}>{diasCorto(info.diasRestantes)}</span>
-            </>
-          );
-          return (
-            <li key={item.id}>
-              {isAdmin ? (
-                <button type="button" onClick={() => onRegister(item)} title={`${tooltip}. Toca para registrar.`}
-                  className="w-full flex items-center gap-2 px-4 py-1.5 text-left hover:bg-brand-bg/70 transition-colors">
-                  {content}
-                </button>
-              ) : (
-                <div title={tooltip} className="flex items-center gap-2 px-4 py-1.5">{content}</div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {rows.length === 0 ? <p className="text-xs text-brand-gray text-center py-4">Nada aquí.</p> : porGrupo(rows).map(([grupo, filas]) => (
+        <div key={grupo}>
+          <h3 className="px-4 pt-2.5 pb-1 text-[11px] font-semibold text-brand-gray uppercase tracking-wider truncate">
+            {grupo} <span className="font-normal tabular-nums">· {filas.length}</span>
+          </h3>
+          <ul className="pb-1">
+            {filas.map(({ item, info, ubic }) => {
+              const Icon = item.categoria === 'CPU' ? Cpu : Laptop;
+              const content = (
+                <>
+                  <Icon size={14} className="text-brand-gray flex-shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-brand-ink truncate">{ubic.titulo}</span>
+                    <span className="block text-xs text-brand-gray truncate">
+                      {item.categoria === 'Laptops' ? 'Portátil' : 'CPU'} · <span className="font-mono">{item.numeroInventario || item.nombre}</span>
+                    </span>
+                  </span>
+                  <span className={`text-xs font-semibold tabular-nums whitespace-nowrap ${style.text}`} aria-hidden="true">{diasCorto(info.diasRestantes)}</span>
+                  <span className="sr-only">, {diasLargo(info.diasRestantes)}</span>
+                </>
+              );
+              return (
+                <li key={item.id}>
+                  {isAdmin ? (
+                    <button type="button" onClick={() => onRegister({ item, info, ubic })} title={`${formatFecha(info.proximaFecha)} · Toca para registrar el mantenimiento`}
+                      className="w-full min-h-[44px] flex items-center gap-2.5 px-4 py-1.5 text-left hover:bg-brand-bg/70 transition-colors">
+                      {content}
+                    </button>
+                  ) : (
+                    <div className="min-h-[44px] flex items-center gap-2.5 px-4 py-1.5">{content}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </section>
   );
 };
 
 const MaintenanceScreen = ({ db, user, onBack }) => {
   const isAdmin = user.role === 'Administrador';
-  const { items, loading, registerMaintenance } = useInventory(db, user);
-  const [target, setTarget] = useState(null);
+  const { items, loading, registrarEvento: registrarEnEquipo } = useInventory(db, user);
+  const { puestos, loading: cargandoPuestos, registrarEvento: registrarEnPuesto } = usePuestos(db, user);
+  const [target, setTarget] = useState(null); // { item, info, ubic }
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
 
   const groups = useMemo(() => {
-    const found = groupMaintenanceByUrgency(items);
+    const porId = new Map(puestos.map(p => [p.id, p]));
+    const found = groupMaintenanceByUrgency(items).map(g => ({
+      ...g, rows: g.rows.map(r => ({ ...r, ubic: conTituloDeFila(r.item, ubicacionEquipo(r.item, porId)) })),
+    }));
     return GRUPOS_URGENCIA.map(g => found.find(f => f.key === g.key) ?? { ...g, rows: [] });
-  }, [items]);
+  }, [items, puestos]);
   const totalRelevantes = useMemo(() => groups.reduce((n, g) => n + g.rows.length, 0), [groups]);
 
   // Si falla, el error se propaga al modal (que lo muestra y deja reintentar).
-  const handleConfirmRegister = async (fecha, notas) => {
-    const nombre = target.nombre;
-    await registerMaintenance(target.id, fecha, notas);
+  const handleConfirm = async (ev) => {
+    const { item, ubic } = target;
+    if (ubic.puesto) await registrarEnPuesto(ubic.puesto, ev, item);
+    else await registrarEnEquipo(item, ev);
     setTarget(null);
-    showToast(`Mantenimiento de ${nombre} registrado`);
+    showToast(`Mantenimiento de ${ubic.titulo} registrado · próximo ${formatFecha(proximoTrasRegistrar(item, ev.fecha))}`);
   };
 
   return (
@@ -152,11 +145,13 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
           </button>}
           <div>
             <h1 className="text-xl font-bold text-brand-ink">Mantenimientos preventivos</h1>
-            <p className="text-xs text-brand-gray mt-0.5">Laptops y CPU, ordenados por urgencia</p>
+            <p className="text-xs text-brand-gray mt-0.5">
+              CPU y portátiles por urgencia, agrupados por equipo de trabajo{isAdmin ? '. Toca uno para registrarlo.' : ''}
+            </p>
           </div>
         </header>
 
-        {loading ? (
+        {loading || cargandoPuestos ? (
           <div className="flex flex-col items-center gap-3 py-16 text-brand-gray">
             <Loader2 size={24} className="animate-spin text-brand-ember" />
             <span className="text-sm">Cargando equipos…</span>
@@ -174,7 +169,8 @@ const MaintenanceScreen = ({ db, user, onBack }) => {
         )}
       </div>
 
-      <RegisterMaintenanceModal isOpen={!!target} onClose={() => setTarget(null)} onConfirm={handleConfirmRegister} itemName={target?.nombre} />
+      <MantenimientoModal isOpen={!!target} onClose={() => setTarget(null)} onConfirm={handleConfirm}
+        equipo={target?.item} ubicacion={target?.ubic.titulo} proximaFecha={target?.info.proximaFecha} conPuesto={!!target?.ubic.puesto} />
       <ToastHost toast={toast} onDismiss={dismissToast} />
     </div>
   );
