@@ -64,7 +64,8 @@ service cloud.firestore {
       let d = request.resource.data;
       return d.keys().hasOnly(['codigo', 'creadoPor', 'categoria', 'urgencia', 'puestoId', 'puestoNombre',
           'equipoId', 'equipoNombre', 'equipoCodigo', 'descripcion', 'estado', 'creadoAt', 'actualizado',
-          'mensajes', 'vistoPorTI', 'vistoPorColaborador'])
+          'mensajes', 'vistoPorTI', 'vistoPorColaborador', 'adjuntos'])
+        && (!('adjuntos' in d) || (d.adjuntos is list && d.adjuntos.size() <= 3))
         && d.creadoPor.uid == request.auth.uid
         && d.creadoPor.email == miCorreo()
         && d.categoria in ['equipo', 'internet', 'software', 'cuentas', 'impresora', 'otro']
@@ -83,6 +84,16 @@ service cloud.firestore {
         && d.mensajes.size() <= antes.mensajes.size() + 1
         && d.mensajes.size() >= antes.mensajes.size()
         && d.mensajes.size() <= 200;
+    }
+
+    // Un pedazo de un archivo adjunto (ver src/utils/adjuntos.js): el archivo va en base64,
+    // partido en documentos de hasta ~700 KB (un archivo de 5 MB son 10 pedazos como máximo).
+    function isValidParteAdjunto() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['archivoId', 'orden', 'datos'])
+        && d.archivoId is string && d.archivoId.size() <= 40
+        && d.orden is int && d.orden >= 0 && d.orden < 12
+        && d.datos is string && d.datos.size() <= 720000;
     }
 
     // Valida los documentos de bloqueo de login (ver src/utils/loginLockout.js).
@@ -137,6 +148,15 @@ service cloud.firestore {
       allow create: if isActiveColaborador() && isValidTicketCreate(appId);
       allow read:   if isActiveColaborador() && resource.data.creadoPor.uid == request.auth.uid;
       allow update: if isActiveColaborador() && resource.data.creadoPor.uid == request.auth.uid && isValidTicketComment();
+    }
+    // Archivos adjuntos de SUS tickets: subir pedazos (en el mismo lote que el ticket o el
+    // mensaje, por eso getAfter) y leerlos. T.I. ya tiene acceso por la regla general.
+    match /artifacts/{appId}/public/data/tickets/{ticketId}/partes/{parteId} {
+      allow read: if isActiveColaborador()
+        && get(/databases/$(database)/documents/artifacts/$(appId)/public/data/tickets/$(ticketId)).data.creadoPor.uid == request.auth.uid;
+      allow create: if isActiveColaborador()
+        && getAfter(/databases/$(database)/documents/artifacts/$(appId)/public/data/tickets/$(ticketId)).data.creadoPor.uid == request.auth.uid
+        && isValidParteAdjunto();
     }
 
     // Historial de un equipo (subcolección): solo lectura para cualquier

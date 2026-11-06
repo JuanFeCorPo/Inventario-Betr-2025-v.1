@@ -8,14 +8,31 @@
 
 import { useEffect, useState } from 'react';
 import {
-  collection, doc, onSnapshot, query, where, Timestamp, writeBatch, arrayUnion, addDoc, serverTimestamp,
+  collection, doc, getDoc, onSnapshot, query, where, Timestamp, writeBatch, arrayUnion, serverTimestamp,
 } from 'firebase/firestore';
 import { TICKETS_PATH, PUESTOS_PATH, EQUIPOS_PATH } from '../config/firebase';
 import { codigoTicket, tituloTicket } from '../utils/tickets';
+import { partirBase64, unirPartes, base64ABlob } from '../utils/adjuntos';
 
 const HISTORIAL = 'historial';
 const now = () => Timestamp.now();
 const conId = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+// ── Archivos adjuntos ─────────────────────────
+// Cada archivo (base64) va partido en documentos de tickets/{id}/partes, en el mismo lote
+// que el mensaje. Devuelve las fichas que se guardan en el mensaje.
+const escribirAdjuntos = (db, batch, ticketId, archivos = []) => archivos.map((a) => {
+  const partes = partirBase64(a.base64);
+  partes.forEach((datos, i) => batch.set(doc(db, TICKETS_PATH, ticketId, 'partes', `${a.id}_${i}`), { archivoId: a.id, orden: i, datos }));
+  return { id: a.id, nombre: a.nombre, tipo: a.tipo, tamano: a.tamano, partes: partes.length };
+});
+
+// Lee un adjunto y lo devuelve como Blob (para mostrarlo o descargarlo).
+export const leerAdjunto = async (db, ticketId, adj) => {
+  const snaps = await Promise.all(Array.from({ length: adj.partes }, (_, i) => getDoc(doc(db, TICKETS_PATH, ticketId, 'partes', `${adj.id}_${i}`))));
+  if (snaps.some(sn => !sn.exists())) throw new Error('El archivo ya no está disponible.');
+  return base64ABlob(unirPartes(snaps.map(sn => sn.data().datos)), adj.tipo);
+};
 
 // ── Bandeja de T.I. ───────────────────────────
 export const useTicketsTI = (db, user) => {
@@ -30,7 +47,7 @@ export const useTicketsTI = (db, user) => {
   }, [db]);
 
   const yo = () => user.nombre || user.email;
-  const mensaje = (texto) => ({ autor: 'ti', nombre: yo(), texto: texto.trim(), fecha: now() });
+  const mensaje = (texto, adjuntos = []) => ({ autor: 'ti', nombre: yo(), texto: texto.trim(), fecha: now(), ...(adjuntos.length ? { adjuntos } : {}) });
   const ref = (t) => doc(db, TICKETS_PATH, t.id);
   const equipoLog = (batch, equipoId, action, extra = {}) =>
     batch.set(doc(collection(db, EQUIPOS_PATH, equipoId, HISTORIAL)), { timestamp: now(), user: user.email, action, ...extra });
@@ -56,9 +73,10 @@ export const useTicketsTI = (db, user) => {
     await b.commit();
   };
 
-  const responder = async (t, texto) => {
+  const responder = async (t, texto, archivos = []) => {
     const b = writeBatch(db);
-    b.update(ref(t), { mensajes: arrayUnion(mensaje(texto)), actualizado: now(), vistoPorTI: true, vistoPorColaborador: false });
+    const fichas = escribirAdjuntos(db, b, t.id, archivos);
+    b.update(ref(t), { mensajes: arrayUnion(mensaje(texto, fichas)), actualizado: now(), vistoPorTI: true, vistoPorColaborador: false });
     await b.commit();
   };
 
@@ -150,9 +168,13 @@ export const useMisTickets = (db, user) => {
       () => setLoading(false));
   }, [db, user?.uid]);
 
-  const crear = async ({ categoria, puesto, equipo, descripcion, urgencia }) => {
+  const crear = async ({ categoria, puesto, equipo, descripcion, urgencia, archivos = [] }) => {
     const codigo = codigoTicket();
-    await addDoc(collection(db, TICKETS_PATH), {
+    // Un solo lote: el ticket y los pedazos de sus archivos se guardan juntos o no se guarda nada
+    const b = writeBatch(db);
+    const ticketRef = doc(collection(db, TICKETS_PATH));
+    const fichas = escribirAdjuntos(db, b, ticketRef.id, archivos);
+    b.set(ticketRef, {
       codigo,
       creadoPor: { uid: user.uid, email: (user.email ?? '').toLowerCase(), nombre: user.nombre || user.displayName || '' },
       categoria, urgencia,
@@ -162,14 +184,17 @@ export const useMisTickets = (db, user) => {
       // Hora del servidor: las reglas verifican que no se pueda inventar
       estado: 'recibido', creadoAt: serverTimestamp(), actualizado: serverTimestamp(),
       mensajes: [], vistoPorTI: false, vistoPorColaborador: true,
+      ...(fichas.length ? { adjuntos: fichas } : {}),
     });
+    await b.commit();
     return codigo;
   };
 
-  const comentar = async (t, texto) => {
+  const comentar = async (t, texto, archivos = []) => {
     const b = writeBatch(db);
+    const fichas = escribirAdjuntos(db, b, t.id, archivos);
     b.update(doc(db, TICKETS_PATH, t.id), {
-      mensajes: arrayUnion({ autor: 'colaborador', nombre: user.nombre || user.email, texto: texto.trim(), fecha: Timestamp.now() }),
+      mensajes: arrayUnion({ autor: 'colaborador', nombre: user.nombre || user.email, texto: texto.trim(), fecha: Timestamp.now(), ...(fichas.length ? { adjuntos: fichas } : {}) }),
       actualizado: Timestamp.now(), vistoPorTI: false, vistoPorColaborador: true,
     });
     await b.commit();

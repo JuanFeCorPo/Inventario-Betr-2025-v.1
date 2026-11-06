@@ -5,13 +5,13 @@
 //  Al resolver, queda en la hoja de vida del puesto (Novedad + Correctivo).
 // ─────────────────────────────────────────────
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Search, Loader2, Inbox, AlertOctagon, CheckCircle2, RotateCcw, Hand, X } from 'lucide-react';
 import { Button, Field, Spinner, ToastHost } from '../components/ui';
 import { fieldClass } from '../components/ui/fieldClasses';
 import useAsyncAction from '../hooks/useAsyncAction';
 import useToast from '../hooks/useToast';
-import { useTicketsTI } from '../hooks/useTickets';
+import { useTicketsTI, leerAdjunto } from '../hooks/useTickets';
 import { tituloTicket, ordenarTickets, haceCuanto, estaAbierto, pendientesTI, URGENCIAS, CATEGORIAS_TICKET } from '../utils/tickets';
 import { formatFechaHora } from '../utils/format';
 import { EstadoTicket, Conversacion, CampoMensaje, PuntoNuevo } from '../components/tickets/TicketUI';
@@ -131,7 +131,7 @@ const Acciones = ({ t, acciones, onAviso }) => {
   );
 };
 
-const Detalle = ({ t, isAdmin, acciones, onCerrar, onAviso, onVerPuesto }) => (
+const Detalle = ({ t, isAdmin, acciones, onCerrar, onAviso, onVerPuesto, cargarAdjunto }) => (
   <article className="bg-white border border-brand-border rounded-2xl shadow-card">
     <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-brand-border">
       <div className="min-w-0">
@@ -163,8 +163,8 @@ const Detalle = ({ t, isAdmin, acciones, onCerrar, onAviso, onVerPuesto }) => (
       <Dato label={t.estado === 'resuelto' ? 'Resuelta por' : 'La atiende'}>{t.estado === 'resuelto' ? t.resueltoPor : t.tomadoPor}</Dato>
     </dl>
     <div className="px-5 py-4 space-y-4">
-      <Conversacion ticket={t} yo="ti" />
-      {isAdmin && estaAbierto(t) && <CampoMensaje onEnviar={(texto) => acciones.responder(t, texto)} placeholder={`Responder a ${t.creadoPor?.nombre?.split(' ')[0] || 'la persona'}…`} />}
+      <Conversacion ticket={t} yo="ti" cargarAdjunto={cargarAdjunto} />
+      {isAdmin && estaAbierto(t) && <CampoMensaje onEnviar={(texto, archivos) => acciones.responder(t, texto, archivos)} placeholder={`Responder a ${t.creadoPor?.nombre?.split(' ')[0] || 'la persona'}…`} />}
       {isAdmin && <div className="pt-1 border-t border-brand-border"><div className="pt-3"><Acciones t={t} acciones={acciones} onAviso={onAviso} /></div></div>}
     </div>
   </article>
@@ -189,6 +189,8 @@ const SolicitudesScreen = ({ db, user, onBack, onNavigate, ticketInicial = null 
   }, [tickets, filtro, term]);
 
   const sel = tickets.find(t => t.id === selId);
+  // Los archivos de la conversación abierta se leen de su ticket
+  const cargarAdjunto = useCallback((adj) => leerAdjunto(db, selId, adj), [db, selId]);
   // En pantalla grande se abre la primera; al abrir una, se marca como vista
   useEffect(() => { if (!selId && lista.length && window.matchMedia('(min-width: 1024px)').matches) setSelId(lista[0].id); }, [lista, selId]);
   const marcar = useRef(acciones.marcarVisto);
@@ -246,7 +248,7 @@ const SolicitudesScreen = ({ db, user, onBack, onNavigate, ticketInicial = null 
 
           <div className={sel ? '' : 'hidden lg:block'}>
             {sel ? (
-              <Detalle t={sel} isAdmin={isAdmin} acciones={acciones} onCerrar={() => setSelId(null)} onAviso={(m) => showToast(m)}
+              <Detalle t={sel} isAdmin={isAdmin} acciones={acciones} cargarAdjunto={cargarAdjunto} onCerrar={() => setSelId(null)} onAviso={(m) => showToast(m)}
                 onVerPuesto={onNavigate ? (puestoId) => onNavigate('puestos', { puestoId }) : undefined} />
             ) : (
               <div className="bg-white/60 border border-dashed border-brand-border rounded-2xl py-16 text-center text-sm text-brand-gray">Elige un ticket para verlo.</div>

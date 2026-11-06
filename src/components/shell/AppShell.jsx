@@ -10,6 +10,7 @@ import { Home, MessageSquareWarning, Monitor, Wrench, LogOut, Users, ChevronDown
 import { LOGO_URL } from '../../config/constants';
 import { usePopover } from '../../hooks/usePopover';
 import AlertsBell from '../AlertsBell';
+import Avatar from './Avatar';
 
 const PESTANAS = [
   { key: 'dashboard',   label: 'Inicio',         icon: Home,                 conteo: null,             aviso: '' },
@@ -31,23 +32,9 @@ const Insignia = ({ n, accion = false, className = '' }) => (n > 0 ? (
 const etiquetaPestana = (p, n) => (n > 0 ? `${p.label}: ${n} ${p.aviso}` : p.label);
 // Nombre visible: el del perfil; si no hay, la parte del correo antes de la @.
 const nombreVisible = (user) => (user.nombre || '').trim() || (user.email || '').split('@')[0];
-// Iniciales: primera letra del nombre y del apellido; sin nombre, la inicial del correo.
-const iniciales = (user) => {
-  const partes = (user.nombre || '').trim().split(/\s+/).filter(Boolean);
-  if (partes.length) return (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
-  return (user.email || '?')[0].toUpperCase();
-};
 const ROL = {
   Administrador: { icon: ShieldCheck, cls: 'bg-brand-orange/15 text-brand-ember' },
   Lector:        { icon: Eye,         cls: 'bg-blue-50 text-blue-700' },
-};
-
-// Foto de Google si la hay; si no, iniciales sobre la tinta de marca.
-const Avatar = ({ user, size = 'sm' }) => {
-  const dim = size === 'lg' ? 'w-11 h-11 text-base rounded-xl' : 'w-8 h-8 text-xs rounded-lg';
-  return user.photoURL
-    ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className={`${dim} object-cover flex-shrink-0`} />
-    : <span aria-hidden="true" className={`${dim} flex items-center justify-center bg-brand-orange text-brand-cocoa font-bold flex-shrink-0`}>{iniciales(user)}</span>;
 };
 
 const RolBadge = ({ role }) => {

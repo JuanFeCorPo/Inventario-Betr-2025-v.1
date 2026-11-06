@@ -67,7 +67,7 @@ export const haceCuanto = (v, ahora = Date.now()) => {
   if (h < 24) return `hace ${h} h`;
   const d = Math.round(h / 24);
   if (d < 30) return `hace ${d} día${d === 1 ? '' : 's'}`;
-  return new Date(t).toLocaleDateString('es-CO');
+  return `el ${new Date(t).toLocaleDateString('es-CO')}`;
 };
 
 // Valida lo que el colaborador escribe antes de enviar.
@@ -80,3 +80,45 @@ export const validarTicket = ({ categoria, equipoId, descripcion }) => {
   if (d.length > 2000) errores.descripcion = 'Máximo 2000 caracteres.';
   return errores;
 };
+
+// ── Vista del colaborador ──
+// Quién atiende, en corto: "Juan Felipe Cortés" → "Juan"; un correo → lo de antes de la @.
+// Si se tomó cuando T.I. aún no tenía nombre (quedó el correo) y luego respondió ya con
+// su nombre, se usa ese nombre.
+export const quienAtiende = (t) => {
+  const s = String(t?.tomadoPor ?? '').trim();
+  if (!s) return '';
+  if (!s.includes('@')) return s.split(/\s+/)[0];
+  const conNombre = [...(t.mensajes ?? [])].reverse().find(m => m.autor === 'ti' && m.nombre && !String(m.nombre).includes('@'));
+  return conNombre ? String(conNombre.nombre).trim().split(/\s+/)[0] : s.split('@')[0];
+};
+
+// La línea que responde "¿qué pasa con mi problema?" (la etiqueta ya dice el estado).
+export const lineaParaColaborador = (t, ahora = Date.now()) => {
+  if (t.estado === 'resuelto') return `Resuelto ${haceCuanto(t.resueltoAt ?? t.actualizado, ahora)}`.trim();
+  const cuando = haceCuanto(t.actualizado ?? t.creadoAt, ahora);
+  const quien = quienAtiende(t);
+  const que = t.estado === 'en_proceso'
+    ? (quien ? `Lo atiende ${quien}` : 'T.I. lo está atendiendo')
+    : 'T.I. lo revisará pronto';
+  return cuando ? `${que} · ${cuando}` : que;
+};
+
+export const tieneRespuestaNueva = (t) => t?.vistoPorColaborador === false;
+
+// Para el colaborador: primero lo que T.I. le respondió, luego lo abierto (lo más
+// reciente arriba) y al final lo resuelto.
+export const ordenarParaColaborador = (tickets) => [...tickets].sort((a, b) => {
+  const na = tieneRespuestaNueva(a) ? 0 : 1, nb = tieneRespuestaNueva(b) ? 0 : 1;
+  if (na !== nb) return na - nb;
+  const ab = estaAbierto(a), bb = estaAbierto(b);
+  if (ab !== bb) return ab ? -1 : 1;
+  return ms(b.actualizado ?? b.creadoAt) - ms(a.actualizado ?? a.creadoAt);
+});
+
+// ── Avisos mientras la app está abierta ──
+// Identifica "una respuesta nueva": cambia cuando T.I. escribe otra vez o cambia el estado.
+export const firmaRespuesta = (t) => `${t.id}|${(t.mensajes ?? []).length}|${t.estado}`;
+
+// "(2) T.I. te respondió · BETR MEDIA TECH" en la pestaña; sin respuestas, el título normal.
+export const tituloPestana = (base, nuevas) => (nuevas > 0 ? `(${nuevas}) T.I. te respondió · ${base}` : base);

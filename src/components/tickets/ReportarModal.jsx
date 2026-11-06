@@ -1,26 +1,42 @@
 // Reportar un problema (colaborador): ¿qué pasa? → ¿con qué equipo? → cuéntanos.
-import { useState, useEffect } from 'react';
+// `equipoInicial`: si se abre tocando un equipo de "Mi puesto", ya viene elegido.
+import { useState, useEffect, useRef } from 'react';
 import { Monitor, Wifi, AppWindow, KeyRound, Printer, HelpCircle } from 'lucide-react';
 import { Modal, Button, Field, FormActions, Spinner } from '../ui';
 import { fieldClass } from '../ui/fieldClasses';
 import useAsyncAction from '../../hooks/useAsyncAction';
+import useAdjuntos from '../../hooks/useAdjuntos';
+import { SelectorAdjuntos } from './AdjuntosUI';
 import { CATEGORIAS_TICKET, URGENCIAS, validarTicket } from '../../utils/tickets';
 import { CASILLAS, casillaDe } from '../../utils/puestos';
 import { iconoCasilla } from '../puestos/casillaIcons';
 
 const ICONOS = { equipo: Monitor, internet: Wifi, software: AppWindow, cuentas: KeyRound, impresora: Printer, otro: HelpCircle };
 
-const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar }) => {
+const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar, equipoInicial = null }) => {
   const [categoria, setCategoria] = useState('');
   const [equipoId, setEquipoId] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [urgencia, setUrgencia] = useState('normal');
   const [errores, setErrores] = useState({});
   const { busy, error, run, reset } = useAsyncAction();
+  const adj = useAdjuntos();
+  const limpiarAdj = adj.limpiar;
+  const listaRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) { setCategoria(''); setEquipoId(''); setDescripcion(''); setUrgencia('normal'); setErrores({}); reset(); }
-  }, [isOpen, reset]);
+    if (isOpen) {
+      setCategoria(equipoInicial ? 'equipo' : ''); setEquipoId(equipoInicial ?? '');
+      setDescripcion(''); setUrgencia('normal'); setErrores({}); reset(); limpiarAdj();
+    }
+  }, [isOpen, equipoInicial, reset, limpiarAdj]);
+
+  // Si vino con el equipo elegido, la lista baja hasta él (puede estar al final)
+  useEffect(() => {
+    if (!isOpen || !equipoInicial) return undefined;
+    const id = setTimeout(() => listaRef.current?.querySelector('[aria-checked="true"]')?.scrollIntoView({ block: 'nearest' }), 60);
+    return () => clearTimeout(id);
+  }, [isOpen, equipoInicial]);
 
   const misEquipos = puestos.flatMap(p => (equipos[p.id] ?? []).map(e => ({ ...e, puesto: p })))
     .sort((a, b) => CASILLAS.findIndex(c => c.key === casillaDe(a)) - CASILLAS.findIndex(c => c.key === casillaDe(b)));
@@ -32,7 +48,7 @@ const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar }
     const err = validarTicket({ categoria, equipoId, descripcion });
     setErrores(err);
     if (Object.keys(err).length) return;
-    run(() => onEnviar({ categoria, puesto: elegido?.puesto ?? puestos[0] ?? null, equipo: elegido ?? null, descripcion, urgencia }),
+    run(() => onEnviar({ categoria, puesto: elegido?.puesto ?? puestos[0] ?? null, equipo: elegido ?? null, descripcion, urgencia, archivos: adj.archivos }),
       'No se pudo enviar el ticket. Revisa tu conexión e inténtalo de nuevo.');
   };
 
@@ -70,7 +86,7 @@ const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar }
         {categoria === 'equipo' && (
           <fieldset className="animate-reveal">
             <legend className="text-xs font-semibold text-brand-slate mb-2">¿Cuál equipo?</legend>
-            <ul role="radiogroup" aria-label="Equipo" className="border border-brand-border rounded-xl divide-y divide-brand-border max-h-60 overflow-y-auto">
+            <ul ref={listaRef} role="radiogroup" aria-label="Equipo" className="border border-brand-border rounded-xl divide-y divide-brand-border max-h-60 overflow-y-auto">
               {misEquipos.map(e => {
                 const Icon = iconoCasilla(casillaDe(e), [e]);
                 const activo = equipoId === e.id;
@@ -101,6 +117,7 @@ const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar }
                 placeholder={placeholder} autoFocus maxLength={2000} aria-invalid={!!errores.descripcion}
                 className={`${fieldClass} h-28 resize-none`} />
             </Field>
+            <SelectorAdjuntos adj={adj} disabled={busy} />
             <fieldset>
               <legend className="text-xs font-semibold text-brand-slate mb-1.5">¿Puedes seguir trabajando?</legend>
               <div role="radiogroup" aria-label="Urgencia" className="grid grid-cols-2 gap-1 p-1 vidrio rounded-xl">
@@ -117,7 +134,7 @@ const ReportarModal = ({ isOpen, onClose, puestos = [], equipos = {}, onEnviar }
 
         <FormActions error={error}>
           <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button type="submit" disabled={busy || !categoria} className="flex items-center gap-2">
+          <Button type="submit" disabled={busy || !categoria || adj.procesando} className="flex items-center gap-2">
             {busy && <Spinner size="sm" tone="dark" />}
             {busy ? 'Enviando…' : 'Enviar a T.I.'}
           </Button>
