@@ -35,8 +35,20 @@ export const LOGIN_ATTEMPTS_PATH = 'loginAttempts';
 export const DISMISSED_ALERTS_PATH = 'dismissedAlerts';
 export { firebaseConfig, configError };
 
+// Inicio de sesión con Google en el MISMO dominio del inventario.
+// Chrome, Safari y Firefox bloquean el almacenamiento entre dominios: si el ingreso
+// pasa por *.firebaseapp.com, al volver de Google (signInWithRedirect, la entrada
+// directa desde BETR People Center y la app instalada) la sesión se pierde y vuelve
+// al login. vercel.json reenvía /__/auth/* a Firebase, así que en producción el
+// authDomain es el propio inventario.betrmedia.com. En local se deja el de Firebase.
+function configConDominioPropio(config) {
+  if (typeof window === 'undefined') return config;
+  const host = window.location.host;
+  return /(^|\.)betrmedia\.com$/.test(window.location.hostname) ? { ...config, authDomain: host } : config;
+}
+
 export function initFirebase() {
   if (!firebaseConfig) throw new Error('Firebase config no encontrada.');
-  const app = initializeApp(firebaseConfig);
+  const app = initializeApp(configConDominioPropio(firebaseConfig));
   return { auth: getAuth(app), db: getFirestore(app) };
 }

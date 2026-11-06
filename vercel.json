@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/__/auth/:path*", "destination": "https://inventario-betrmedia-sas.firebaseapp.com/__/auth/:path*" },
+    { "source": "/__/firebase/:path*", "destination": "https://inventario-betrmedia-sas.firebaseapp.com/__/firebase/:path*" }
+  ]
+}
