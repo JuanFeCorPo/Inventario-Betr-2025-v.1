@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ArrowLeft, Plus, Search, Loader2, Monitor, AlertTriangle, FileUp, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Loader2, Monitor, AlertTriangle, FileUp, ChevronRight, X, Archive } from 'lucide-react';
 import { EmptyState, Button, ToastHost } from '../components/ui';
 import { formatFecha } from '../utils/format';
 import {
@@ -71,14 +71,40 @@ const FilaPuesto = ({ puesto, equipos, onOpen }) => {
   );
 };
 
+// Fila de un puesto archivado: cuándo, por qué y quién lo usaba (el "portátiles backup").
+const FilaArchivado = ({ puesto, equipos, onOpen }) => {
+  const principal = equipos.find(e => e.categoria === 'CPU' || e.categoria === 'Laptops');
+  const cuando = puesto.archivadoAt?.toDate ? formatFecha(puesto.archivadoAt.toDate()) : '';
+  const detalle = [puesto.archivadoMotivo, puesto.archivadoPersonas && `Última persona: ${puesto.archivadoPersonas}`].filter(Boolean).join(' · ');
+  return (
+    <li>
+      <button type="button" onClick={onOpen} aria-label={`${puesto.nombre}, archivado${cuando ? ` el ${cuando}` : ''}. Abrir hoja de vida`}
+        className="w-full grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.4fr)_120px_minmax(0,1.6fr)_16px] items-center gap-x-4 gap-y-1 px-4 py-3 text-left hover:bg-brand-bg/70 transition-colors">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-brand-ink truncate" title={puesto.nombre}>{puesto.nombre}</span>
+          <span className="block text-xs text-brand-gray truncate">{grupoDe(puesto).nombre} · {puesto.area}</span>
+        </span>
+        <span className="hidden md:block font-mono text-xs text-brand-slate truncate">{principal?.numeroInventario ?? '—'}</span>
+        <span className="min-w-0 col-span-2 md:col-span-1 row-start-2 md:row-start-auto">
+          <span className="block text-xs text-brand-slate truncate">{cuando ? `Archivado el ${cuando}` : 'Archivado'}</span>
+          {detalle && <span className="block text-xs text-brand-gray truncate" title={detalle}>{detalle}</span>}
+        </span>
+        <ChevronRight size={16} className="hidden md:block text-brand-gray" aria-hidden="true" />
+      </button>
+    </li>
+  );
+};
+
 const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
   const isAdmin = user.role === 'Administrador';
   const { items, loading: loadingItems } = useInventory(db, user);
-  const { puestos, hayImportados, loading: loadingPuestos, ...actions } = usePuestos(db, user);
+  const { puestos, archivados, hayImportados, loading: loadingPuestos, ...actions } = usePuestos(db, user);
   // Desde Inicio se puede llegar directo a la hoja de vida de un puesto
   const [selectedId, setSelectedId] = useState(puestoInicial);
   const [term, setTerm] = useState('');
-  const [soloPendientes, setSoloPendientes] = useState(false);
+  // 'todos' | 'pendientes' | 'archivados'
+  const [vista, setVista] = useState('todos');
+  const soloPendientes = vista === 'pendientes';
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [importarOpen, setImportarOpen] = useState(false);
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
@@ -89,9 +115,9 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
 
   const equiposPorPuesto = useMemo(() => {
     const map = new Map();
-    for (const p of puestos) map.set(p.id, equiposDelPuesto(items, p.id));
+    for (const p of [...puestos, ...archivados]) map.set(p.id, equiposDelPuesto(items, p.id));
     return map;
-  }, [items, puestos]);
+  }, [items, puestos, archivados]);
 
   const pendientes = useMemo(
     () => new Set(puestos.filter(p => resumenPuesto(p, equiposPorPuesto.get(p.id) ?? []).pendiente).map(p => p.id)),
@@ -109,7 +135,14 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
   }, [puestos, term, soloPendientes, pendientes, equiposPorPuesto]);
   const hayResultados = areas.length > 0;
 
-  const selected = puestos.find(p => p.id === selectedId);
+  const archivadosFiltrados = useMemo(() => {
+    const q = plano(term).trim();
+    return archivados.filter(p => !q
+      || plano(p.nombre).includes(q) || plano(p.archivadoMotivo).includes(q) || plano(p.archivadoPersonas).includes(q)
+      || (equiposPorPuesto.get(p.id) ?? []).some(e => plano(e.numeroInventario).includes(q) || plano(e.numeroSerial).includes(q)));
+  }, [archivados, term, equiposPorPuesto]);
+
+  const selected = puestos.find(p => p.id === selectedId) ?? archivados.find(p => p.id === selectedId);
 
   const abrir = (id) => { scrollLista.current = window.scrollY; setSelectedId(id); };
   const volver = () => setSelectedId(null);
@@ -135,6 +168,18 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
     });
   };
 
+  // Archivar (o pasar a otro puesto y archivar) desde la hoja: vuelve a la lista con aviso y Deshacer
+  const handleArchivado = (puesto, mensaje, deshacer, alDeshacer) => {
+    setSelectedId(null);
+    showToast(mensaje, {
+      ms: 10000,
+      action: { label: 'Deshacer', onClick: async () => {
+        try { await deshacer(); showToast(alDeshacer); }
+        catch { showToast('No se pudo deshacer. Revisa tu conexión.'); }
+      } },
+    });
+  };
+
   const handleImportado = (resumen) => {
     setImportarOpen(false);
     if (resumen) showToast(`Hojas de vida importadas: ${resumen.puestos} puestos`);
@@ -147,7 +192,7 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
       <main className="relative z-10 max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {selected ? (
           <HojaDeVida key={selected.id} db={db} puesto={selected} equipos={equiposPorPuesto.get(selected.id) ?? []}
-            items={items} puestos={puestos} isAdmin={isAdmin} actions={actions} onBack={volver} onEliminado={handleEliminado} />
+            items={items} puestos={puestos} isAdmin={isAdmin} actions={actions} onBack={volver} onEliminado={handleEliminado} onArchivado={handleArchivado} />
         ) : (
           <>
             <header className="flex items-center justify-between gap-4 mb-5">
@@ -184,7 +229,7 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
                 <Loader2 size={24} className="animate-spin text-brand-ember" />
                 <span className="text-sm">Cargando puestos…</span>
               </div>
-            ) : puestos.length === 0 ? (
+            ) : puestos.length === 0 && archivados.length === 0 ? (
               <div className="bg-white border border-brand-border rounded-2xl shadow-card">
                 <EmptyState icon={<Monitor size={30} />} title="Aún no hay puestos registrados."
                   action={isAdmin && (puedeImportar
@@ -207,23 +252,44 @@ const PuestosScreen = ({ db, user, onBack, puestoInicial = null }) => {
                     )}
                   </div>
                   <div role="radiogroup" aria-label="Mostrar" className="flex gap-1 p-1 vidrio rounded-xl w-fit">
-                    {[[false, `Todos · ${puestos.length}`], [true, `Con pendientes · ${pendientes.size}`]].map(([v, label]) => (
-                      <button key={label} type="button" role="radio" aria-checked={soloPendientes === v} onClick={() => setSoloPendientes(v)}
-                        className={`h-8 px-3 rounded-lg text-sm font-medium transition whitespace-nowrap ${soloPendientes === v ? 'bg-brand-ink text-white' : 'text-brand-slate hover:text-brand-ink'}`}>
-                        {label}
+                    {[['todos', `Todos · ${puestos.length}`], ['pendientes', `Con pendientes · ${pendientes.size}`], ['archivados', `Archivados · ${archivados.length}`]].map(([v, label]) => (
+                      <button key={v} type="button" role="radio" aria-checked={vista === v} onClick={() => setVista(v)}
+                        className={`h-8 px-3 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center gap-1.5 ${vista === v ? 'bg-brand-ink text-white' : 'text-brand-slate hover:text-brand-ink'}`}>
+                        {v === 'archivados' && <Archive size={13} aria-hidden="true" />}{label}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {!hayResultados && (
-                  <div className="bg-white border border-brand-border rounded-2xl">
-                    <EmptyState icon={<Search size={26} />} title={soloPendientes && !term ? 'Ningún puesto tiene pendientes.' : 'Ningún puesto coincide.'}
-                      action={<Button variant="secondary" size="sm" onClick={() => { setTerm(''); setSoloPendientes(false); }}>Ver todos</Button>} />
-                  </div>
+                {vista === 'archivados' && (
+                  archivadosFiltrados.length === 0 ? (
+                    <div className="bg-white border border-brand-border rounded-2xl">
+                      <EmptyState icon={<Archive size={26} />}
+                        title={term ? 'Ningún puesto archivado coincide.' : 'Aún no hay puestos archivados. Cuando un portátil o puesto deje de usarse, archívalo desde su hoja de vida: queda aquí con todo su historial.'}
+                        action={term ? <Button variant="secondary" size="sm" onClick={() => setTerm('')}>Limpiar búsqueda</Button> : null} />
+                    </div>
+                  ) : (
+                    <section aria-label="Puestos archivados" className="bg-white border border-brand-border rounded-2xl shadow-card overflow-clip">
+                      <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-brand-border bg-brand-bg/50">
+                        <h2 className="text-sm font-semibold text-brand-ink">Archivados</h2>
+                        <span className="text-xs text-brand-gray tabular-nums">{archivadosFiltrados.length} puesto{archivadosFiltrados.length === 1 ? '' : 's'} · el último archivado primero</span>
+                      </header>
+                      <ul className="divide-y divide-brand-border">
+                        {archivadosFiltrados.map(p => (
+                          <FilaArchivado key={p.id} puesto={p} equipos={equiposPorPuesto.get(p.id) ?? []} onOpen={() => abrir(p.id)} />
+                        ))}
+                      </ul>
+                    </section>
+                  )
                 )}
 
-                {areas.map(({ area, grupos }) => (
+                {vista !== 'archivados' && !hayResultados && (
+                  <div className="bg-white border border-brand-border rounded-2xl">
+                    <EmptyState icon={<Search size={26} />} title={soloPendientes && !term ? 'Ningún puesto tiene pendientes.' : 'Ningún puesto coincide.'}
+                      action={<Button variant="secondary" size="sm" onClick={() => { setTerm(''); setVista('todos'); }}>Ver todos</Button>} />
+                  </div>
+                )}
+                {vista !== 'archivados' && areas.map(({ area, grupos }) => (
                   <section key={area} className="mb-8" aria-labelledby={`area-${area}`}>
                     <h2 id={`area-${area}`} className="text-xs font-semibold text-brand-slate uppercase tracking-wider mb-3">
                       {area} <span className="text-brand-gray font-normal normal-case tracking-normal">· {grupos.reduce((s, g) => s + g.puestos.length, 0)} puestos</span>

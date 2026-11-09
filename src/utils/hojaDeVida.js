@@ -100,8 +100,9 @@ export function retiradosDelPuesto(historial = [], items = [], equiposActuales =
 }
 
 // Texto de un componente en su celda: "BM-INV-0115 - Monitor Samsung / SN - 0ACH…"
-const textoComponente = (codigo, nombre, serial) =>
-  [codigo, nombre].filter(Boolean).join(' - ') + (serialLimpio(serial) ? ` / SN - ${serialLimpio(serial)}` : '');
+const textoComponente = (codigo, nombre, serial, cargador = '') =>
+  [codigo, nombre].filter(Boolean).join(' - ') + (serialLimpio(serial) ? ` / SN - ${serialLimpio(serial)}` : '')
+  + (cargador ? ` / Cargador - ${cargador}` : '');
 
 // Registros del sistema que no van en la hoja (la importación y los tachados se ven en otro lado).
 const ES_DEL_SISTEMA = /^(Puesto importado de la hoja de vida|Puesto creado\.)|\(tachado en la hoja de vida\)|en el inventario está De Baja: no se agrega/;
@@ -109,7 +110,11 @@ const ES_DEL_SISTEMA = /^(Puesto importado de la hoja de vida|Puesto creado\.)|\
 // ── F-MAN-02: puesto de trabajo ──
 export function datosHojaPuesto({ puesto, equipos = [], principal = null, historial = [], items = [] }) {
   const componentes = Object.fromEntries(CASILLAS.map(c => [c.key, []]));
-  for (const e of equipos) componentes[casillaDe(e)].push({ texto: textoComponente(e.numeroInventario, e.nombre, e.numeroSerial), retirado: false });
+  for (const e of equipos) {
+    const cas = casillaDe(e);
+    // El cargador del computador va en su propia casilla de la hoja (Fuente); el de un celular, junto a él
+    componentes[cas].push({ texto: textoComponente(e.numeroInventario, e.nombre, e.numeroSerial, cas === 'principal' ? '' : texto(e.cargador)), retirado: false });
+  }
   // Lo que el puesto tiene sin código de inventario (audífonos por serial, pad mouse) vive en Observaciones
   for (const linea of texto(puesto.observaciones).split('\n')) {
     const m = linea.match(/^(Aud[ií]fonos|Accesorios|Celular|Mouse|Teclado|Monitor|Ups)\s*:\s*(.+)$/i);

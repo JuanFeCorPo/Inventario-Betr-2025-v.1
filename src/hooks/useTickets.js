@@ -138,7 +138,7 @@ export const useMiPuesto = (db, user) => {
   useEffect(() => {
     if (!db || !correo) return undefined;
     return onSnapshot(query(collection(db, PUESTOS_PATH), where('correos', 'array-contains', correo)),
-      snap => { setPuestos(conId(snap).filter(p => !p.eliminado)); setLoading(false); },
+      snap => { setPuestos(conId(snap).filter(p => !p.eliminado && !p.archivado)); setLoading(false); },
       () => { setPuestos([]); setLoading(false); });
   }, [db, correo]);
 

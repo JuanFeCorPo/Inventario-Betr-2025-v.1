@@ -149,7 +149,7 @@ const ItemFormModal = ({ isOpen, onClose, onSave, currentItem, items = [], encar
             <input name="numeroSerial" value={item.numeroSerial??''} onChange={handleChange} autoComplete="off" className={f} />
           </Field>
           {CATEGORIAS_CON_CARGADOR.includes(item.categoria) && (
-            <Field label="Cargador" hint="Nº de inventario del cargador de este portátil.">
+            <Field label="Cargador" hint={`Nº de inventario del cargador de este ${item.categoria === 'Smartphones' ? 'celular' : 'portátil'}.`}>
               <input name="cargador" value={item.cargador??''} onChange={handleChange} placeholder="Ej: BM-INV-0226"
                 autoComplete="off" className={`${f} font-mono`} />
             </Field>

@@ -313,8 +313,52 @@ export const CasillaPickerModal = ({ isOpen, onClose, items, puestos, puesto, ca
 };
 
 // ── Trasladar un equipo a otro puesto (se inicia desde el origen) ──
-export const TrasladarModal = ({ isOpen, onClose, equipo, origen, puestos, items, onConfirm }) => {
+// Buscador + lista de puestos (por equipo de trabajo) para elegir el destino. La usan
+// Trasladar y Pasar a otro puesto.
+const ListaPuestosDestino = ({ puestos, excluirId, onElegir }) => {
   const [term, setTerm] = useState('');
+  const plano = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const grupos = useMemo(() => {
+    const q = plano(term).trim();
+    const candidatos = puestos.filter(p => p.id !== excluirId)
+      .filter(p => !q || plano(p.nombre).includes(q) || (p.personas ?? []).some(x => plano(x.nombre).includes(q)) || plano(grupoDe(p).nombre).includes(q));
+    return agruparPuestos(candidatos).flatMap(a => a.grupos.map(g => ({ ...g, area: a.area })));
+  }, [puestos, excluirId, term]);
+  return (
+    <>
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" aria-hidden="true" />
+        <input value={term} onChange={e => setTerm(e.target.value)} autoFocus placeholder="Buscar puesto, persona o equipo de trabajo"
+          aria-label="Buscar puesto de destino" className={`${fieldClass} pl-9`} />
+      </div>
+      <div className="border border-brand-border rounded-xl max-h-72 overflow-y-auto">
+        {grupos.length === 0 && <p className="text-sm text-brand-gray text-center py-6">Ningún puesto coincide.</p>}
+        {grupos.map(g => (
+          <div key={`${g.area}-${g.nombre}`}>
+            <p className="sticky top-0 bg-brand-bg/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-slate">{g.nombre} <span className="font-normal normal-case tracking-normal text-brand-gray">· {g.area}</span></p>
+            <ul>
+              {g.puestos.map(p => (
+                <li key={p.id}>
+                  <button type="button" onClick={() => onElegir(p)}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-brand-bg focus-visible:bg-brand-bg transition-colors">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-brand-ink truncate">{p.nombre}</span>
+                      <span className="flex items-center gap-1 text-xs text-brand-gray truncate">
+                        <UsersIcon size={11} aria-hidden="true" />{(p.personas ?? []).map(x => x.nombre).join(', ') || 'Sin persona asignada'}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+export const TrasladarModal = ({ isOpen, onClose, equipo, origen, puestos, items, onConfirm }) => {
   const [destino, setDestino] = useState(null);
   const [motivo, setMotivo] = useState('');
   const { busy, error, run, reset } = useAsyncAction();
@@ -323,15 +367,7 @@ export const TrasladarModal = ({ isOpen, onClose, equipo, origen, puestos, items
   const eq = ultimo.current.equipo;
   const or = ultimo.current.origen;
 
-  useEffect(() => { if (isOpen) { setTerm(''); setDestino(null); setMotivo(''); reset(); } }, [isOpen, reset]);
-
-  const plano = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const grupos = useMemo(() => {
-    const q = plano(term).trim();
-    const candidatos = puestos.filter(p => p.id !== or?.id)
-      .filter(p => !q || plano(p.nombre).includes(q) || (p.personas ?? []).some(x => plano(x.nombre).includes(q)) || plano(grupoDe(p).nombre).includes(q));
-    return agruparPuestos(candidatos).flatMap(a => a.grupos.map(g => ({ ...g, area: a.area })));
-  }, [puestos, or, term]);
+  useEffect(() => { if (isOpen) { setDestino(null); setMotivo(''); reset(); } }, [isOpen, reset]);
 
   if (!eq) return null;
   const cas = casillaDe(eq);
@@ -368,36 +404,7 @@ export const TrasladarModal = ({ isOpen, onClose, equipo, origen, puestos, items
         </div>
 
         {!destino ? (
-          <>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray pointer-events-none" aria-hidden="true" />
-              <input value={term} onChange={e => setTerm(e.target.value)} autoFocus placeholder="Buscar puesto, persona o equipo de trabajo"
-                aria-label="Buscar puesto de destino" className={`${fieldClass} pl-9`} />
-            </div>
-            <div className="border border-brand-border rounded-xl max-h-72 overflow-y-auto">
-              {grupos.length === 0 && <p className="text-sm text-brand-gray text-center py-6">Ningún puesto coincide.</p>}
-              {grupos.map(g => (
-                <div key={`${g.area}-${g.nombre}`}>
-                  <p className="sticky top-0 bg-brand-bg/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-brand-slate">{g.nombre} <span className="font-normal normal-case tracking-normal text-brand-gray">· {g.area}</span></p>
-                  <ul>
-                    {g.puestos.map(p => (
-                      <li key={p.id}>
-                        <button type="button" onClick={() => setDestino(p)}
-                          className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-brand-bg focus-visible:bg-brand-bg transition-colors">
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm text-brand-ink truncate">{p.nombre}</span>
-                            <span className="block text-xs text-brand-gray truncate flex items-center gap-1">
-                              <UsersIcon size={11} aria-hidden="true" />{(p.personas ?? []).map(x => x.nombre).join(', ') || 'Sin persona asignada'}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </>
+          <ListaPuestosDestino puestos={puestos} excluirId={or?.id} onElegir={setDestino} />
         ) : (
           <div className="space-y-4 animate-reveal">
             {yaHay.length > 0 && (
@@ -428,7 +435,7 @@ export const TrasladarModal = ({ isOpen, onClose, equipo, origen, puestos, items
 
 // ── Eliminar un puesto ─────────────────────────
 // Dice qué pasa con sus equipos antes de confirmar. Se puede deshacer justo después.
-export const EliminarPuestoModal = ({ isOpen, onClose, puesto, equipos = [], onConfirm }) => {
+export const EliminarPuestoModal = ({ isOpen, onClose, puesto, equipos = [], onConfirm, onArchivar }) => {
   const { busy, error, run, reset } = useAsyncAction();
   const ultimo = useRef({ puesto, equipos });
   if (isOpen && puesto) ultimo.current = { puesto, equipos };
@@ -451,8 +458,13 @@ export const EliminarPuestoModal = ({ isOpen, onClose, puesto, equipos = [], onC
               {enUso > 0 ? <>; {enUso === eqs.length ? 'todos pasan' : `${enUso} pasan`} de En Uso a <b>Disponible</b></> : ''}.
             </li>
           ) : <li>El puesto no tiene equipos.</li>}
-          <li>Su hoja de vida deja de verse en la lista.</li>
+          <li>Su hoja de vida deja de verse en la app: queda guardada, pero ya no se puede abrir ni descargar desde aquí.</li>
         </ul>
+        {onArchivar && (
+          <p className="text-sm text-brand-slate bg-brand-bg rounded-lg px-3 py-2.5">
+            ¿Solo dejó de usarse? <button type="button" onClick={onArchivar} className="font-semibold text-brand-ember underline underline-offset-2">Archívalo</button>: conserva su hoja de vida completa y se puede descargar.
+          </p>
+        )}
         <p className="text-xs text-brand-gray">Justo después podrás deshacerlo desde el aviso.</p>
         <FormActions error={error}>
           <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
@@ -652,6 +664,167 @@ export const MantenimientoModal = ({ isOpen, onClose, onConfirm, equipo, ubicaci
         <FormActions error={error}>
           <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
           <SaveButton busy={busy}>Registrar mantenimiento</SaveButton>
+        </FormActions>
+      </form>
+    </Modal>
+  );
+};
+
+// ── Archivar un puesto ─────────────────────────
+// El "portátiles backup" de las hojas de Sheets: no se borra nada. La hoja queda completa
+// en Archivados y los equipos se quedan dentro de ella como Disponibles.
+export const ArchivarPuestoModal = ({ isOpen, onClose, puesto, equipos = [], onConfirm }) => {
+  const [motivo, setMotivo] = useState('');
+  const { busy, error, run, reset } = useAsyncAction();
+  const ultimo = useRef({ puesto, equipos });
+  if (isOpen && puesto) ultimo.current = { puesto, equipos };
+  const { puesto: p, equipos: eqs } = ultimo.current;
+  useEffect(() => { if (isOpen) { setMotivo(''); reset(); } }, [isOpen, reset]);
+  if (!p) return null;
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    run(() => onConfirm(motivo), 'No se pudo archivar el puesto. Revisa tu conexión e inténtalo de nuevo.');
+  };
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Archivar puesto" size="sm">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <p className="text-sm text-brand-ink">Se archiva <span className="font-semibold">“{p.nombre}”</span>: sale de la lista de puestos y queda en <b>Archivados</b>.</p>
+        <ul className="text-sm text-brand-slate space-y-1.5 list-disc pl-5">
+          <li>Su hoja de vida queda <b>completa</b> (historial, mantenimientos y componentes) y se puede descargar.</li>
+          {eqs.length > 0 && <li>Sus {eqs.length} equipo{eqs.length === 1 ? '' : 's'} se quedan en esta hoja como Disponible{eqs.length === 1 ? '' : 's'} (backup) y no piden mantenimiento.</li>}
+          <li>Para usarlo otra vez, el botón <b>Volver a usar</b> lo trae de regreso con todo su historial.</li>
+        </ul>
+        <p className="text-xs text-brand-gray bg-brand-bg rounded-lg px-3 py-2">
+          ¿Algo de aquí se va a usar en otro puesto, o la persona pasa a otro equipo? Antes usa <b>Pasar a otro puesto</b>.
+        </p>
+        <Field label="Motivo (opcional)">
+          <input value={motivo} onChange={e => setMotivo(e.target.value)} autoFocus maxLength={200}
+            placeholder="Ej: el portátil ya no se usa" className={fieldClass} />
+        </Field>
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <SaveButton busy={busy} busyText="Archivando…">Archivar puesto</SaveButton>
+        </FormActions>
+      </form>
+    </Modal>
+  );
+};
+
+// ── Pasar a otro puesto ────────────────────────
+// La persona y lo que usaba pasan a la hoja del puesto nuevo; queda anotado en las dos hojas.
+// Lo que no se pasa se queda en la hoja de origen, que (si se pide) se archiva.
+const clavePersonaUI = (p) => String(p?.correo || p?.nombre || '').trim().toLowerCase();
+
+const TarjetaPuesto = ({ titulo, puesto: p, tono }) => (
+  <div className={`min-w-0 flex-1 rounded-xl border p-3 ${tono}`}>
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-gray">{titulo}</p>
+    <p className="text-sm font-semibold text-brand-ink truncate mt-0.5">{p?.nombre ?? 'Elige un puesto'}</p>
+    {p && <p className="text-xs text-brand-gray truncate">{grupoDe(p).nombre}</p>}
+  </div>
+);
+
+export const PasarPuestoModal = ({ isOpen, onClose, origen, equipos = [], puestos, onConfirm }) => {
+  const [destino, setDestino] = useState(null);
+  const [equiposSel, setEquiposSel] = useState(new Set());
+  const [personasSel, setPersonasSel] = useState(new Set());
+  const [archivar, setArchivar] = useState(true);
+  const [motivo, setMotivo] = useState('');
+  const { busy, error, run, reset } = useAsyncAction();
+  const ultimo = useRef({ origen, equipos });
+  if (isOpen && origen) ultimo.current = { origen, equipos };
+  const { origen: or, equipos: eqs } = ultimo.current;
+  const personas = useMemo(() => (or?.personas ?? []).filter(p => p.nombre || p.correo), [or]);
+
+  // Al abrir: se va todo menos el computador (CPU o portátil), que se queda en backup
+  useEffect(() => {
+    if (!isOpen) return;
+    setDestino(null); setMotivo(''); setArchivar(true); reset();
+    setEquiposSel(new Set(eqs.filter(e => casillaDe(e) !== 'principal').map(e => e.id)));
+    setPersonasSel(new Set(personas.map(clavePersonaUI)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir
+  }, [isOpen]);
+
+  if (!or) return null;
+  const alternar = (set, setSet, clave) => setSet(prev => { const n = new Set(prev); if (n.has(clave)) n.delete(clave); else n.add(clave); return n; });
+  const total = equiposSel.size + personasSel.size;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!destino || total === 0) return;
+    run(() => onConfirm(destino, {
+      equipos: eqs.filter(x => equiposSel.has(x.id)),
+      personas: personas.filter(x => personasSel.has(clavePersonaUI(x))),
+      restantes: eqs.filter(x => !equiposSel.has(x.id)),
+      archivar, motivo,
+    }), 'No se pudo pasar al otro puesto. Revisa tu conexión e inténtalo de nuevo.');
+  };
+
+  const Casilla = ({ checked, onChange, titulo, detalle, nota }) => (
+    <label className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-brand-bg/60 transition-colors">
+      <input type="checkbox" checked={checked} onChange={onChange} className="mt-1 w-4 h-4 rounded border-brand-border flex-shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-brand-ink truncate">{titulo}</span>
+        {detalle && <span className="block text-xs text-brand-gray truncate">{detalle}</span>}
+      </span>
+      {nota && <span className="text-[11px] text-brand-gray whitespace-nowrap mt-0.5">{nota}</span>}
+    </label>
+  );
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Pasar a otro puesto">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <div className="flex items-stretch gap-2">
+          <TarjetaPuesto titulo="Sale de" puesto={or} tono="border-brand-border bg-white" />
+          <MoveRight size={18} className="self-center text-brand-gray flex-shrink-0" aria-hidden="true" />
+          <TarjetaPuesto titulo="Pasa a" puesto={destino} tono={destino ? 'border-brand-orange/50 bg-brand-orange/5' : 'border-dashed border-brand-border bg-white'} />
+        </div>
+
+        {!destino ? (
+          <>
+            <p className="text-sm text-brand-slate">¿A qué puesto pasa? Es la hoja del portátil o equipo nuevo (si aún no existe, créalo primero en Nuevo puesto).</p>
+            <ListaPuestosDestino puestos={puestos} excluirId={or.id} onElegir={setDestino} />
+          </>
+        ) : (
+          <div className="space-y-4 animate-reveal">
+            <div>
+              <p className="text-xs font-semibold text-brand-slate mb-1.5">¿Qué se va con la persona?</p>
+              <div className="border border-brand-border rounded-xl divide-y divide-brand-border max-h-64 overflow-y-auto">
+                {personas.map(p => (
+                  <Casilla key={clavePersonaUI(p)} checked={personasSel.has(clavePersonaUI(p))}
+                    onChange={() => alternar(personasSel, setPersonasSel, clavePersonaUI(p))}
+                    titulo={p.nombre || p.correo} detalle={p.nombre ? p.correo : ''} nota="Persona" />
+                ))}
+                {eqs.map(e => (
+                  <Casilla key={e.id} checked={equiposSel.has(e.id)} onChange={() => alternar(equiposSel, setEquiposSel, e.id)}
+                    titulo={e.nombre} detalle={`${e.numeroInventario || 'Sin Nº'} · ${etiquetaCasilla(casillaDe(e))}`}
+                    nota={casillaDe(e) === 'principal' && !equiposSel.has(e.id) ? 'Se queda' : ''} />
+                ))}
+                {personas.length === 0 && eqs.length === 0 && <p className="text-sm text-brand-gray text-center py-5">Este puesto no tiene personas ni equipos.</p>}
+              </div>
+              <p className="text-xs text-brand-gray mt-1.5">El computador (CPU o portátil) queda marcado para que se quede en su hoja.</p>
+            </div>
+
+            <label className="flex items-start gap-2.5 text-sm text-brand-ink cursor-pointer">
+              <input type="checkbox" checked={archivar} onChange={e => setArchivar(e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-brand-border" />
+              <span>
+                Archivar “{or.nombre}” al terminar
+                <span className="block text-xs text-brand-gray">Pasa a Archivados con su hoja completa; lo que no pases se queda en backup dentro de ella.</span>
+              </span>
+            </label>
+
+            <div className="flex items-end gap-3 flex-wrap">
+              <Field label="Motivo (opcional)" className="flex-1 min-w-[200px]">
+                <input value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={200} placeholder="Ej: cambio de portátil" className={fieldClass} />
+              </Field>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDestino(null)} className="mb-1">Cambiar destino</Button>
+            </div>
+            <p className="text-xs text-brand-gray bg-brand-bg rounded-lg px-3 py-2">Queda anotado en las dos hojas de vida, la de “{or.nombre}” y la de “{destino.nombre}”.</p>
+          </div>
+        )}
+
+        <FormActions error={error}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <SaveButton busy={busy} busyText="Pasando…" disabled={!destino || total === 0}>Pasar a otro puesto</SaveButton>
         </FormActions>
       </form>
     </Modal>

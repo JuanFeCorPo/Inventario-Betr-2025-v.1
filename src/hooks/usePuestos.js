@@ -9,7 +9,8 @@ import {
   collection, doc, onSnapshot, query, Timestamp, writeBatch, deleteField,
 } from 'firebase/firestore';
 import { PUESTOS_PATH, EQUIPOS_PATH } from '../config/firebase';
-import { etiquetaEquipo, limpiarPersonas, casillaDe, recientesPrimero } from '../utils/puestos';
+import { CATEGORIAS_CON_MANTENIMIENTO } from '../config/constants';
+import { etiquetaEquipo, limpiarPersonas, casillaDe, recientesPrimero, moverPersonas, nombresPersonas, archivadosRecientesPrimero } from '../utils/puestos';
 
 const HISTORIAL = 'historial';
 // Encargado que queda en el inventario cuando un equipo sale de un puesto
@@ -35,7 +36,9 @@ const usePuestos = (db, user) => {
     return unsub;
   }, [db]);
 
-  const puestos = useMemo(() => todos.filter(p => !p.eliminado), [todos]);
+  // Los archivados (el "portátiles backup" de las hojas de Sheets) no salen en la lista normal.
+  const puestos = useMemo(() => todos.filter(p => !p.eliminado && !p.archivado), [todos]);
+  const archivados = useMemo(() => archivadosRecientesPrimero(todos.filter(p => !p.eliminado && p.archivado)), [todos]);
   // Para no volver a ofrecer la importación si ya se hizo (aunque luego se eliminen puestos)
   const hayImportados = useMemo(() => todos.some(p => p.origen === 'hoja-de-vida'), [todos]);
 
@@ -283,7 +286,101 @@ const usePuestos = (db, user) => {
     };
   };
 
-  return { puestos, hayImportados, loading, eliminarPuesto, savePuesto, asignarEquipo, retirarEquipo, reemplazarEquipo, trasladarEquipo, registrarEvento, importarHojas };
+  // ── Archivar / volver a usar ─────────────────
+  // Archivar NO borra nada: el puesto sale de la lista y queda en "Archivados" con su hoja de
+  // vida completa, y sus equipos se quedan dentro de ella (Disponibles, sin pedir mantenimiento).
+  // Así, cuando el portátil se vuelve a usar, "Volver a usar" trae la misma hoja con su historial.
+  const FOTO_EQUIPO = [...CAMPOS_REVERSIBLES, 'sinMantenimiento', 'sinMantenimientoPorArchivo'];
+  const fotoEquipo = (e) => ({ id: e.id, ...Object.fromEntries(FOTO_EQUIPO.map(k => [k, e[k]])) });
+  const FOTO_PUESTO = ['archivado', 'archivadoAt', 'archivadoPor', 'archivadoMotivo', 'archivadoPersonas', 'personas', 'correos'];
+  const fotoPuesto = (p) => ({ id: p.id, ...Object.fromEntries(FOTO_PUESTO.map(k => [k, p[k]])) });
+  const restaurar = (batch, ref, antes) =>
+    batch.update(ref, Object.fromEntries(Object.entries(antes).map(([k, v]) => [k, v === undefined ? deleteField() : v])));
+  const deshacerCambio = ({ equipos = [], puestos: ps = [], refs = [], que }) => async () => {
+    const batch = writeBatch(db);
+    for (const { id, ...antes } of equipos) { restaurar(batch, doc(db, EQUIPOS_PATH, id), antes); equipoLog(batch, id, `Se deshizo: ${que}`); }
+    for (const { id, ...antes } of ps) restaurar(batch, doc(db, PUESTOS_PATH, id), antes);
+    refs.forEach(r => batch.delete(r));
+    await batch.commit();
+  };
+
+  // Marca el puesto como archivado y deja sus equipos en backup dentro de la hoja.
+  const marcarArchivo = (batch, puesto, equiposDelPuesto, motivo, personasQueUsaban) => {
+    const texto = (motivo ?? '').trim();
+    batch.update(doc(db, PUESTOS_PATH, puesto.id), {
+      archivado: true, archivadoAt: now(), archivadoPor: user.email,
+      archivadoMotivo: texto || deleteField(), archivadoPersonas: nombresPersonas(personasQueUsaban) || deleteField(),
+    });
+    for (const e of equiposDelPuesto) {
+      const c = {};
+      if (e.estado === 'En Uso') { c.estado = 'Disponible'; c.estadoDesde = now(); }
+      if (e.personaEncargada !== ENCARGADO_SIN_PUESTO) c.personaEncargada = ENCARGADO_SIN_PUESTO;
+      if (CATEGORIAS_CON_MANTENIMIENTO.includes(e.categoria) && e.sinMantenimiento !== true) { c.sinMantenimiento = true; c.sinMantenimientoPorArchivo = true; }
+      if (Object.keys(c).length) batch.update(doc(db, EQUIPOS_PATH, e.id), c);
+      equipoLog(batch, e.id, `El puesto "${puesto.nombre}" se archivó: el equipo queda en backup dentro de su hoja de vida.`);
+    }
+    return puestoLog(batch, puesto.id, { tipo: 'nota', descripcion: `Puesto archivado${texto ? `: ${texto}` : '.'}` });
+  };
+
+  const archivarPuesto = async (puesto, equiposDelPuesto = [], motivo = '') => {
+    const batch = writeBatch(db);
+    const ref = marcarArchivo(batch, puesto, equiposDelPuesto, motivo, puesto.personas ?? []);
+    await batch.commit();
+    return deshacerCambio({ equipos: equiposDelPuesto.map(fotoEquipo), puestos: [fotoPuesto(puesto)], refs: [ref], que: `archivar el puesto "${puesto.nombre}".` });
+  };
+
+  const reactivarPuesto = async (puesto, equiposDelPuesto = []) => {
+    const batch = writeBatch(db);
+    batch.update(doc(db, PUESTOS_PATH, puesto.id), {
+      archivado: deleteField(), archivadoAt: deleteField(), archivadoPor: deleteField(), archivadoMotivo: deleteField(), archivadoPersonas: deleteField(),
+    });
+    for (const e of equiposDelPuesto) {
+      const c = { personaEncargada: puesto.nombre };
+      if (e.estado === 'Disponible') { c.estado = 'En Uso'; c.estadoDesde = now(); }
+      if (e.sinMantenimientoPorArchivo) { c.sinMantenimiento = deleteField(); c.sinMantenimientoPorArchivo = deleteField(); }
+      batch.update(doc(db, EQUIPOS_PATH, e.id), c);
+      equipoLog(batch, e.id, `El puesto "${puesto.nombre}" volvió a usarse: el equipo sale del backup.`);
+    }
+    const ref = puestoLog(batch, puesto.id, { tipo: 'nota', descripcion: 'Puesto vuelto a usar.' });
+    await batch.commit();
+    return deshacerCambio({ equipos: equiposDelPuesto.map(fotoEquipo), puestos: [fotoPuesto(puesto)], refs: [ref], que: `volver a usar el puesto "${puesto.nombre}".` });
+  };
+
+  // ── Pasar a otro puesto (la persona y lo que usaba) ──
+  // Equivale a "pasarle a la hoja del nuevo portátil la persona y los periféricos": en un solo
+  // paso los equipos y las personas elegidos salen de la hoja de origen y entran a la del destino,
+  // y queda anotado en las DOS hojas. Si se pide, el puesto de origen queda archivado.
+  // `equipos`: los que se van; `restantes`: los que se quedan en el origen (si se archiva, quedan en backup).
+  const pasarAOtroPuesto = async (origen, destino, { equipos = [], personas = [], restantes = [], archivar = true, motivo = '' }) => {
+    const batch = writeBatch(db);
+    const motivoTxt = motivo?.trim() ? `\nMotivo: ${motivo.trim()}` : '';
+    const refs = [];
+    for (const e of equipos) {
+      batch.update(doc(db, EQUIPOS_PATH, e.id), entrarAlPuesto(e, destino, casillaDe(e)));
+      equipoLog(batch, e.id, `Trasladado de "${origen.nombre}" a "${destino.nombre}".${motivoTxt}`);
+      refs.push(puestoLog(batch, origen.id, { tipo: 'cambio', equipoId: e.id, ...retiradoDe(e), descripcion: `Sale ${etiquetaEquipo(e)}: pasa a "${destino.nombre}".${motivoTxt}` }));
+      refs.push(puestoLog(batch, destino.id, { tipo: 'cambio', equipoId: e.id, descripcion: `Llega ${etiquetaEquipo(e)} desde "${origen.nombre}".${motivoTxt}` }));
+    }
+    if (personas.length) {
+      const m = moverPersonas(origen.personas, destino.personas, personas);
+      batch.update(doc(db, PUESTOS_PATH, origen.id), { personas: m.origen, correos: m.correosOrigen });
+      batch.update(doc(db, PUESTOS_PATH, destino.id), { personas: m.destino, correos: m.correosDestino });
+      const quienes = nombresPersonas(personas);
+      refs.push(puestoLog(batch, origen.id, { tipo: 'cambio', descripcion: `Sale ${quienes}: pasa a "${destino.nombre}".${motivoTxt}` }));
+      refs.push(puestoLog(batch, destino.id, { tipo: 'cambio', descripcion: `Llega ${quienes} desde "${origen.nombre}".${motivoTxt}` }));
+    }
+    if (archivar) {
+      const porque = `Pasó a "${destino.nombre}".${motivo?.trim() ? ` ${motivo.trim()}` : ''}`;
+      refs.push(marcarArchivo(batch, origen, restantes, porque, origen.personas ?? []));
+    }
+    await batch.commit();
+    return deshacerCambio({
+      equipos: [...equipos, ...(archivar ? restantes : [])].map(fotoEquipo),
+      puestos: [fotoPuesto(origen), fotoPuesto(destino)], refs, que: `pasar de "${origen.nombre}" a "${destino.nombre}".`,
+    });
+  };
+
+  return { puestos, archivados, hayImportados, loading, archivarPuesto, reactivarPuesto, pasarAOtroPuesto, eliminarPuesto, savePuesto, asignarEquipo, retirarEquipo, reemplazarEquipo, trasladarEquipo, registrarEvento, importarHojas };
 };
 
 // Historial en vivo de un puesto, más reciente primero.

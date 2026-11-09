@@ -146,6 +146,8 @@ Un equipo pertenece a un puesto con `equipo.puestoId`. La hoja de vida **no se g
 
 **Eliminar un puesto** (`eliminarPuesto`): no se borra; queda con `eliminado: true` (oculto, con su historial) y sus equipos salen (En Uso → Disponible, Encargado Betrmedia). Devuelve Deshacer.
 
+**Archivar un puesto** (`archivarPuesto`, `reactivarPuesto`, `pasarAOtroPuesto`): es el "portátiles backup" de las hojas de Sheets y NO borra nada. El puesto queda con `archivado: true` (+ `archivadoAt`, `archivadoPor`, `archivadoMotivo`, `archivadoPersonas`), sale de `puestos` en `usePuestos` y aparece en `archivados` (filtro Archivados de Puestos, la hoja se abre y se descarga pero no se edita; solo "Volver a usar"). Sus equipos se quedan ligados a la hoja (`puestoId`), pasan de En Uso a Disponible, con Encargado Betrmedia y con `sinMantenimiento` + `sinMantenimientoPorArchivo` para que no pidan mantenimiento (al reactivar se quita solo lo que puso el archivo). `pasarAOtroPuesto` mueve en un solo lote equipos y personas elegidos de la hoja de origen a la de destino (`moverPersonas` actualiza `personas` y `correos` de los dos puestos) y deja "Sale…"/"Llega…" en las dos hojas; si se pide, archiva el origen. Las tres devuelven Deshacer. `useMiPuesto` no muestra al colaborador un puesto archivado.
+
 ### 3.3 `users/{uid}`
 
 `{ email, nombre?, role: 'Administrador' | 'Lector' | 'Colaborador', active: boolean, createdAt?, history: [...] }`. El doc ID es el UID de Firebase Auth. Dos formas de llegar aquí:

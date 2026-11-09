@@ -145,6 +145,24 @@ const useInventory = (db, user) => {
     await batch.commit();
   };
 
+  // ── Completar cargadores (desde Observaciones) ──
+  // Recibe [{ id, nombre, cargador }]. Cada equipo recibe su cargador y queda anotado en su historial.
+  const completarCargadores = async (lista) => {
+    const BATCH_SIZE = 200; // 2 escrituras por equipo
+    for (let i = 0; i < lista.length; i += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      lista.slice(i, i + BATCH_SIZE).forEach(({ id, cargador }) => {
+        batch.update(doc(db, EQUIPOS_PATH, id), { cargador });
+        batch.set(doc(collection(db, EQUIPOS_PATH, id, HISTORIAL)), {
+          timestamp: Timestamp.now(), user: user.email,
+          action: `Cargador ${cargador} anotado en su casilla (estaba en Observaciones).`,
+        });
+      });
+      await batch.commit();
+    }
+    return lista.length;
+  };
+
   // ── Importar en lote desde Excel ─────────────
   const importItems = async (rows) => {
     const BATCH_SIZE = 200; // cada fila implica 2 escrituras (equipo + historial); margen bajo el límite de 500/lote
@@ -209,7 +227,7 @@ const useInventory = (db, user) => {
     await deleteDoc(doc(db, EQUIPOS_ELIMINADOS_PATH, backup.tombstoneId));
   };
 
-  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registrarEvento };
+  return { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registrarEvento, completarCargadores };
 };
 
 export default useInventory;

@@ -259,3 +259,23 @@ const diaDe = (v) => {
 const msDe = (v) => v?.toMillis?.() ?? (v instanceof Date ? v.getTime() : 0);
 export const recientesPrimero = (a, b) =>
   diaDe(b.fecha) - diaDe(a.fecha) || msDe(b.timestamp) - msDe(a.timestamp) || msDe(b.fecha) - msDe(a.fecha);
+
+// ── Pasar personas de una hoja a otra ──
+// Una persona se reconoce por su correo (o por su nombre si no tiene). Las que salen se
+// quitan del puesto de origen y se agregan al destino sin duplicarlas. Devuelve las dos
+// listas ya limpias y los correos de cada puesto (los colaboradores ven el puesto por su correo).
+const clavePersona = (p) => String(p?.correo || p?.nombre || '').trim().toLowerCase();
+export const moverPersonas = (origen = [], destino = [], quienes = []) => {
+  const salen = new Set(quienes.map(clavePersona));
+  const deOrigen = limpiarPersonas(origen.filter(p => !salen.has(clavePersona(p))));
+  const yaEstan = new Set(destino.map(clavePersona));
+  const deDestino = limpiarPersonas([...destino, ...quienes.filter(p => !yaEstan.has(clavePersona(p)))]);
+  const correos = (lista) => lista.map(p => p.correo).filter(Boolean);
+  return { origen: deOrigen, destino: deDestino, correosOrigen: correos(deOrigen), correosDestino: correos(deDestino) };
+};
+
+export const nombresPersonas = (personas = []) => personas.map(p => p.nombre || p.correo).filter(Boolean).join(', ');
+
+// Puestos archivados: el último archivado primero.
+const msArchivo = (p) => p?.archivadoAt?.toMillis?.() ?? 0;
+export const archivadosRecientesPrimero = (puestos) => [...puestos].sort((a, b) => msArchivo(b) - msArchivo(a));

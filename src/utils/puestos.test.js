@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   equiposDelPuesto, equipoPrincipal, ordenarPuestos, buscarEquiposAsignables,
-  etiquetaEquipo, limpiarPersonas, correoValido, ubicacionEquipo, EN_STOCK, recientesPrimero,
+  etiquetaEquipo, limpiarPersonas, correoValido, ubicacionEquipo, EN_STOCK, recientesPrimero, moverPersonas, nombresPersonas, archivadosRecientesPrimero,
 } from './puestos';
 
 const eq = (id, categoria, extra = {}) => ({ id, categoria, nombre: `${categoria} ${id}`, numeroInventario: `BM-INV-${id}`, estado: 'En Uso', ...extra });
@@ -164,5 +164,39 @@ describe('recientesPrimero', () => {
     const mant = { id: 'mant', fecha: t(new Date(2026, 10, 5, 12)), timestamp: t(new Date(2026, 10, 5, 16)) };
     const viejo = { id: 'viejo', fecha: t(new Date(2026, 10, 4, 12)), timestamp: t(new Date(2026, 10, 5, 17)) };
     expect([viejo, cambio, mant].sort(recientesPrimero).map(x => x.id)).toEqual(['mant', 'cambio', 'viejo']);
+  });
+});
+
+describe('moverPersonas', () => {
+  const ana = { nombre: 'Ana Ruiz', correo: 'ana@betrmedia.com' };
+  const luis = { nombre: 'Luis Gómez', correo: 'luis@betrmedia.com' };
+  it('la persona sale del origen y entra al destino, con sus correos', () => {
+    const r = moverPersonas([ana, luis], [], [ana]);
+    expect(r.origen).toEqual([luis]);
+    expect(r.destino).toEqual([ana]);
+    expect(r.correosOrigen).toEqual(['luis@betrmedia.com']);
+    expect(r.correosDestino).toEqual(['ana@betrmedia.com']);
+  });
+  it('no duplica a quien ya estaba en el destino (por correo, sin importar mayúsculas)', () => {
+    const r = moverPersonas([ana], [{ nombre: 'Ana R.', correo: 'ANA@betrmedia.com' }], [ana]);
+    expect(r.destino).toHaveLength(1);
+    expect(r.origen).toEqual([]);
+  });
+  it('sin correo se reconoce por el nombre; sin nada que mover, todo queda igual', () => {
+    const turno = { nombre: 'Turno noche', correo: '' };
+    expect(moverPersonas([turno, ana], [], [turno]).origen).toEqual([ana]);
+    expect(moverPersonas([ana], [luis], []).destino).toEqual([luis]);
+  });
+  it('nombresPersonas junta los nombres (o el correo si no hay nombre)', () => {
+    expect(nombresPersonas([ana, { nombre: '', correo: 'x@betrmedia.com' }])).toBe('Ana Ruiz, x@betrmedia.com');
+    expect(nombresPersonas([])).toBe('');
+  });
+});
+
+describe('archivadosRecientesPrimero', () => {
+  const t = (ms) => ({ toMillis: () => ms });
+  it('ordena por fecha de archivo, el último primero', () => {
+    const out = archivadosRecientesPrimero([{ id: 'a', archivadoAt: t(1) }, { id: 'c' }, { id: 'b', archivadoAt: t(5) }]);
+    expect(out.map(p => p.id)).toEqual(['b', 'a', 'c']);
   });
 });

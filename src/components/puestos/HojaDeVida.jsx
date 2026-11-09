@@ -7,6 +7,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Pencil, ClipboardPlus, Plus, Repeat2, LogOut as SalirIcon, Loader2, History,
   MoreHorizontal, MoveRight, MoreVertical, FileSpreadsheet, FileText, Wrench, CheckCircle2,
+  Archive, ArchiveRestore, ArrowRightLeft,
 } from 'lucide-react';
 import { EmptyState, StatusDot, ToastHost } from '../ui';
 import { CAMPOS_ESPECIFICACIONES } from '../../config/constants';
@@ -20,7 +21,10 @@ import { usePuestoHistorial } from '../../hooks/usePuestos';
 import { usePopover } from '../../hooks/usePopover';
 import useToast from '../../hooks/useToast';
 import { iconoCasilla } from './casillaIcons';
-import { PuestoFormModal, CasillaPickerModal, TrasladarModal, RetirarModal, EventoModal, EliminarPuestoModal, MantenimientoModal } from './PuestoModals';
+import {
+  PuestoFormModal, CasillaPickerModal, TrasladarModal, RetirarModal, EventoModal, EliminarPuestoModal, MantenimientoModal,
+  ArchivarPuestoModal, PasarPuestoModal,
+} from './PuestoModals';
 import DescargarHoja from './DescargarHoja';
 import useDescargasHoja from '../../hooks/useDescargasHoja';
 
@@ -108,6 +112,9 @@ const Casilla = ({ casilla, equipos, sinCodigo, retirados, isAdmin, onAgregar, o
                   <span className="font-mono text-brand-slate whitespace-nowrap">{e.numeroInventario || 'Sin Nº'}</span>
                   {serialLimpio(e.numeroSerial) ? <> · <span className="whitespace-nowrap">SN</span> <span className="font-mono [overflow-wrap:anywhere]">{serialLimpio(e.numeroSerial)}</span></> : null}
                 </p>
+                {e.cargador && casilla.key !== 'principal' && (
+                  <p className="text-xs text-brand-gray">Cargador <span className="font-mono text-brand-slate whitespace-nowrap">{e.cargador}</span></p>
+                )}
                 {e.estado !== 'En Uso' && <span className="mt-0.5 inline-block"><StatusDot status={e.estado} /></span>}
               </div>
               {isAdmin && <AccionesEquipo equipo={e} onTrasladar={onTrasladar} onReemplazar={onReemplazar} onRetirar={onRetirar} />}
@@ -133,7 +140,27 @@ const Casilla = ({ casilla, equipos, sinCodigo, retirados, isAdmin, onAgregar, o
 };
 
 // Menú ⋮ del encabezado en celular (Excel, PDF, Editar).
-const MenuHoja = ({ crearDatos, onEditar, isAdmin }) => {
+// Pasar a otro puesto y Archivar (en escritorio; en celular van dentro del menú ⋮)
+const MenuMas = ({ onPasar, onArchivar }) => {
+  const { open, setOpen, ref, shown } = usePopover();
+  const item = 'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left text-brand-ink hover:bg-brand-bg transition-colors';
+  return (
+    <div ref={ref} className="relative hidden sm:block">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Más acciones del puesto" title="Más acciones"
+        className="w-10 h-10 flex items-center justify-center vidrio rounded-xl text-brand-slate hover:text-brand-ink transition">
+        <MoreHorizontal size={16} />
+      </button>
+      {shown && (
+        <div role="menu" className={`absolute right-0 top-12 z-30 w-60 bg-white border border-brand-border rounded-xl shadow-xl shadow-brand-ink/10 py-1 ${open ? 'animate-pop-in' : 'animate-pop-out'}`}>
+          <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); onPasar(); }}><ArrowRightLeft size={15} className="text-brand-slate" /> Pasar a otro puesto</button>
+          <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); onArchivar(); }}><Archive size={15} className="text-brand-slate" /> Archivar puesto</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MenuHoja = ({ crearDatos, onEditar, isAdmin, onPasar, onArchivar }) => {
   const { open, setOpen, ref, shown } = usePopover();
   const { excel, pdf, aviso } = useDescargasHoja(crearDatos);
   const item = 'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left text-brand-ink hover:bg-brand-bg transition-colors';
@@ -148,6 +175,8 @@ const MenuHoja = ({ crearDatos, onEditar, isAdmin }) => {
           <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); excel(); }}><FileSpreadsheet size={15} className="text-brand-slate" /> Descargar Excel</button>
           <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); pdf(); }}><FileText size={15} className="text-brand-slate" /> Descargar PDF</button>
           {isAdmin && <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); onEditar(); }}><Pencil size={15} className="text-brand-slate" /> Editar puesto</button>}
+          {isAdmin && <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); onPasar(); }}><ArrowRightLeft size={15} className="text-brand-slate" /> Pasar a otro puesto</button>}
+          {isAdmin && <button role="menuitem" type="button" className={item} onClick={() => { setOpen(false); onArchivar(); }}><Archive size={15} className="text-brand-slate" /> Archivar puesto</button>}
         </div>
       )}
       {aviso && <p role="alert" className="absolute right-0 top-12 w-60 text-xs text-rose-700 bg-white border border-rose-200 rounded-lg p-2 shadow-card">{aviso}</p>}
@@ -231,15 +260,23 @@ const FranjaMantenimiento = ({ equipos, isAdmin, onRegistrar }) => {
   );
 };
 
-const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onBack, onEliminado }) => {
+// `onArchivado(puesto, mensaje, deshacer, mensajeAlDeshacer)`: la hoja se archivó y deja de ser
+// un puesto de la lista; la pantalla vuelve a la lista con un aviso que permite Deshacer.
+const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onBack, onEliminado, onArchivado }) => {
   const { historial, loading: loadingHist } = usePuestoHistorial(db, puesto.id);
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
   const principal = equipoPrincipal(equipos);
   const mant = principal ? getMaintenanceInfo(principal) : null;
   const grupo = grupoDe(puesto);
   const tituloRef = useRef(null);
+  // Un puesto archivado se ve y se descarga, pero no se edita: solo "Volver a usar"
+  const archivado = !!puesto.archivado;
+  const puedeEditar = isAdmin && !archivado;
 
   const [editOpen, setEditOpen] = useState(false);
+  const [archivarOpen, setArchivarOpen] = useState(false);
+  const [pasarOpen, setPasarOpen] = useState(false);
+  const [reactivando, setReactivando] = useState(false);
   const [eventoOpen, setEventoOpen] = useState(false);
   const [mantenimiento, setMantenimiento] = useState(null); // { equipo, info }
   const [picker, setPicker] = useState({ open: false, casilla: null, viejo: null });
@@ -324,6 +361,25 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
     onEliminado?.(puesto, deshacer);
   };
 
+  const handleArchivar = async (motivo) => {
+    const deshacer = await actions.archivarPuesto(puesto, equipos, motivo);
+    setArchivarOpen(false);
+    onArchivado?.(puesto, `Puesto "${puesto.nombre}" archivado`, deshacer, `"${puesto.nombre}" volvió a la lista`);
+  };
+  const handleReactivar = async () => {
+    setReactivando(true);
+    try {
+      const deshacer = await actions.reactivarPuesto(puesto, equipos);
+      conDeshacer(`"${puesto.nombre}" vuelve a la lista de puestos`, deshacer);
+    } catch { showToast('No se pudo volver a usar el puesto. Revisa tu conexión.'); } finally { setReactivando(false); }
+  };
+  const handlePasar = async (destino, opciones) => {
+    const deshacer = await actions.pasarAOtroPuesto(puesto, destino, opciones);
+    setPasarOpen(false);
+    if (opciones.archivar) onArchivado?.(puesto, `Pasó a "${destino.nombre}". "${puesto.nombre}" quedó en Archivados`, deshacer, `Todo volvió a "${puesto.nombre}"`);
+    else conDeshacer(`Pasó a "${destino.nombre}"`, deshacer);
+  };
+
   const vacio = equipos.length === 0;
 
   return (
@@ -345,38 +401,61 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="hidden sm:flex items-center gap-2">
             <DescargarHoja disabled={loadingHist} crearDatos={crearDatos} />
-            {isAdmin && (
+            {puedeEditar && (
               <button onClick={() => setEditOpen(true)}
                 className="flex items-center gap-2 vidrio text-brand-slate text-sm px-3 h-10 rounded-xl transition">
                 <Pencil size={14} /> Editar
               </button>
             )}
           </div>
-          {isAdmin && (
+          {puedeEditar && (
             <button onClick={() => setEventoOpen(true)} title="Registrar mantenimiento o novedad"
               className="flex items-center gap-2 vidrio-naranja text-sm font-semibold px-3 sm:px-4 h-10 rounded-xl transition">
               <ClipboardPlus size={15} /> Registrar
             </button>
           )}
-          <MenuHoja crearDatos={crearDatos} onEditar={() => setEditOpen(true)} isAdmin={isAdmin} />
+          {isAdmin && archivado && (
+            <button onClick={handleReactivar} disabled={reactivando}
+              className="flex items-center gap-2 vidrio-naranja text-sm font-semibold px-3 sm:px-4 h-10 rounded-xl transition disabled:opacity-60">
+              <ArchiveRestore size={15} aria-hidden="true" /> {reactivando ? 'Reactivando…' : 'Volver a usar'}
+            </button>
+          )}
+          {puedeEditar && <MenuMas onPasar={() => setPasarOpen(true)} onArchivar={() => setArchivarOpen(true)} />}
+          <MenuHoja crearDatos={crearDatos} onEditar={() => setEditOpen(true)} isAdmin={puedeEditar}
+            onPasar={() => setPasarOpen(true)} onArchivar={() => setArchivarOpen(true)} />
         </div>
       </header>
 
+      {archivado && (
+        <section aria-label="Puesto archivado" className="flex items-center gap-3.5 mb-4 px-4 py-3.5 rounded-2xl bg-white border border-brand-border shadow-card">
+          <span className="w-10 h-10 rounded-xl bg-brand-bg text-brand-slate flex items-center justify-center flex-shrink-0" aria-hidden="true"><Archive size={18} /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-brand-ink">
+              Puesto archivado{puesto.archivadoAt?.toDate ? ` el ${formatFecha(puesto.archivadoAt.toDate())}` : ''}
+            </p>
+            <p className="text-xs text-brand-slate mt-0.5 break-words">
+              {[puesto.archivadoMotivo, puesto.archivadoPersonas && `Última persona: ${puesto.archivadoPersonas}`].filter(Boolean).join(' · ')
+                || 'Su hoja de vida sigue completa: puedes descargarla en Excel o PDF.'}
+            </p>
+          </div>
+        </section>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_380px] gap-4 2xl:gap-5 items-start">
         <div className="space-y-4 2xl:space-y-5 min-w-0">
-          <FranjaMantenimiento equipos={equipos} isAdmin={isAdmin} onRegistrar={(equipo, info) => setMantenimiento({ equipo, info })} />
+          <FranjaMantenimiento equipos={equipos} isAdmin={puedeEditar} onRegistrar={(equipo, info) => setMantenimiento({ equipo, info })} />
 
           {/* Componentes: las casillas del F-MAN-02 */}
           <Card title={`Componentes · ${equipos.length} equipo${equipos.length === 1 ? '' : 's'}`}>
             {vacio && (
               <p className="px-5 pt-4 text-sm text-brand-slate">
-                {isAdmin ? 'Puesto vacío: llena sus casillas con equipos del inventario.' : 'Este puesto todavía no tiene equipos.'}
+                {puedeEditar ? 'Puesto vacío: llena sus casillas con equipos del inventario.' : 'Este puesto todavía no tiene equipos.'}
               </p>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 p-4">
               {CASILLAS.map(c => (
                 <Casilla key={c.key} casilla={c} equipos={porCasilla[c.key]} sinCodigo={sinCodigo[c.key]}
-                  retirados={retirados.filter(r => r.casilla === c.key)} isAdmin={isAdmin}
+                  retirados={retirados.filter(r => r.casilla === c.key)} isAdmin={puedeEditar}
                   onAgregar={() => setPicker({ open: true, casilla: c.key, viejo: null })}
                   onTrasladar={setTraslado}
                   onReemplazar={(e) => setPicker({ open: true, casilla: c.key, viejo: e })}
@@ -480,7 +559,10 @@ const HojaDeVida = ({ db, puesto, equipos, items, puestos, isAdmin, actions, onB
 
       <PuestoFormModal isOpen={editOpen} onClose={() => setEditOpen(false)} onSave={handleSave} puesto={puesto} puestos={puestos}
         onEliminar={() => { setEditOpen(false); setEliminarOpen(true); }} />
-      <EliminarPuestoModal isOpen={eliminarOpen} onClose={() => setEliminarOpen(false)} puesto={puesto} equipos={equipos} onConfirm={handleEliminar} />
+      <EliminarPuestoModal isOpen={eliminarOpen} onClose={() => setEliminarOpen(false)} puesto={puesto} equipos={equipos} onConfirm={handleEliminar}
+        onArchivar={() => { setEliminarOpen(false); setArchivarOpen(true); }} />
+      <ArchivarPuestoModal isOpen={archivarOpen} onClose={() => setArchivarOpen(false)} puesto={puesto} equipos={equipos} onConfirm={handleArchivar} />
+      <PasarPuestoModal isOpen={pasarOpen} onClose={() => setPasarOpen(false)} origen={puesto} equipos={equipos} puestos={puestos} onConfirm={handlePasar} />
       <EventoModal isOpen={eventoOpen} onClose={() => setEventoOpen(false)} onConfirm={handleEvento} principal={principal} />
       <MantenimientoModal isOpen={!!mantenimiento} onClose={() => setMantenimiento(null)} onConfirm={handleMantenimiento}
         equipo={mantenimiento?.equipo} ubicacion={puesto.nombre} proximaFecha={mantenimiento?.info.proximaFecha} conPuesto />

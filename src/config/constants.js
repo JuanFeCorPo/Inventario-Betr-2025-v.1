@@ -16,9 +16,9 @@ export const FRECUENCIA_MANTENIMIENTO_MESES_DEFAULT = 6;
 // Categorías con especificaciones técnicas (componentes) editables
 export const CATEGORIAS_CON_ESPECIFICACIONES = ['Laptops', 'CPU'];
 
-// Categorías con casilla "Cargador" (Nº de inventario del cargador del portátil).
-// El cargador no es un equipo aparte: va anotado en su portátil.
-export const CATEGORIAS_CON_CARGADOR = ['Laptops'];
+// Categorías con casilla "Cargador" (Nº de inventario del cargador del portátil o del celular).
+// El cargador no es un equipo aparte: va anotado en el equipo al que pertenece.
+export const CATEGORIAS_CON_CARGADOR = ['Laptops', 'Smartphones'];
 export const CAMPOS_ESPECIFICACIONES = [
   { key: 'marca',            label: 'Marca' },
   { key: 'modelo',           label: 'Modelo' },

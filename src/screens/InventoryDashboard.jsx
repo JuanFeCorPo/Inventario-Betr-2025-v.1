@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import ItemFormModal from '../components/modals/ItemFormModal';
 import ImportModal   from '../components/modals/ImportModal';
+import CargadoresModal from '../components/modals/CargadoresModal';
 import PreviewModal  from '../components/modals/PreviewModal';
 import ReportModal   from '../components/modals/ReportModal';
 import { DeactivateModal, DeleteConfirmModal } from '../components/modals/OtherModals';
@@ -134,13 +135,14 @@ const LineaEstado = ({ stats, activo, onToggle, loading }) => (
 // ── Dashboard principal ──────────────────────
 const InventoryDashboard = ({ user, db, onNavigate, filtro, filtroNonce }) => {
   const isAdmin = user.role === 'Administrador';
-  const { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registrarEvento } = useInventory(db, user);
+  const { items, loading, saveItem, deactivateItem, deleteItem, restoreItem, importItems, addNote, registrarEvento, completarCargadores } = useInventory(db, user);
   const { toast, show: showToast, dismiss: dismissToast } = useToast();
   const searchRef = useRef(null);
   const inventarioRef = useRef(null);
   const { encargados, addEncargado } = useEncargados(db);
   const [modal,          setModal]          = useState({ type: null, data: null });
   const [showImport,     setShowImport]     = useState(false);
+  const [showCargadores, setShowCargadores] = useState(false);
   const [showReport,     setShowReport]     = useState(false);
   const [searchTerm,     setSearchTerm]     = useState('');
   const [filterCategory, setFilterCategory] = useState('Todos');
@@ -253,11 +255,11 @@ const InventoryDashboard = ({ user, db, onNavigate, filtro, filtroNonce }) => {
   const exportTitle = hasFilters ? 'Descarga en Excel lo que estás viendo' : 'Descarga todo el inventario en Excel, incluidos los equipos dados de baja';
   const dataActions = (
     <DataActions isAdmin={isAdmin} exportLabel={exportLabel} exportTitle={exportTitle}
-      onExport={() => exportInventory(exportItems)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} />
+      onExport={() => exportInventory(exportItems)} onImport={() => setShowImport(true)} onReport={() => setShowReport(true)} onCargadores={() => setShowCargadores(true)} />
   );
 
   // Atajos: "/" busca, "N" añade. Se ignoran al escribir en un campo y con un modal abierto.
-  const modalOpen = modal.type !== null || showImport || showReport;
+  const modalOpen = modal.type !== null || showImport || showReport || showCargadores;
   useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey || modalOpen) return;
@@ -466,6 +468,8 @@ const InventoryDashboard = ({ user, db, onNavigate, filtro, filtroNonce }) => {
       {isAdmin && (<>
         <ImportModal isOpen={showImport} onClose={() => setShowImport(false)} items={items} onImport={importItems} />
         <ReportModal isOpen={showReport} onClose={() => setShowReport(false)} db={db} items={items} />
+        <CargadoresModal isOpen={showCargadores} onClose={() => setShowCargadores(false)} items={items}
+          onConfirm={async (lista) => { const n = await completarCargadores(lista); showToast(`${n} cargador${n === 1 ? '' : 'es'} guardado${n === 1 ? '' : 's'} en su casilla`); }} />
       </>)}
     </main>
   );

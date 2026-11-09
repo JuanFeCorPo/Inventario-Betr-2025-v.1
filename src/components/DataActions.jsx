@@ -1,10 +1,10 @@
-import { Download, Upload, FileSpreadsheet, Database, ChevronDown } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, Database, ChevronDown, PlugZap } from 'lucide-react';
 import { usePopover } from '../hooks/usePopover';
 
 // Acciones de datos del inventario (se usan de vez en cuando): un solo menú "Datos"
 // junto al título del inventario, igual en computador y celular. "Exportar"
 // baja justo lo que se ve; Importar y Reporte son de Administrador.
-const DataActions = ({ isAdmin, exportLabel, exportTitle, onExport, onImport, onReport }) => {
+const DataActions = ({ isAdmin, exportLabel, exportTitle, onExport, onImport, onReport, onCargadores }) => {
   const { open, setOpen, ref, shown } = usePopover();
   const item = 'w-full flex items-start gap-2.5 px-3 py-2.5 text-sm text-left text-brand-ink hover:bg-brand-bg rounded-lg transition-colors';
   const elegir = (fn) => () => { setOpen(false); fn(); };
@@ -25,6 +25,10 @@ const DataActions = ({ isAdmin, exportLabel, exportTitle, onExport, onImport, on
             <button role="menuitem" type="button" className={item} onClick={elegir(onImport)}>
               <Upload size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />
               <span><span className="block">Importar desde Excel</span><span className="block text-xs text-brand-gray">Carga varios equipos a la vez</span></span>
+            </button>
+            <button role="menuitem" type="button" className={item} onClick={elegir(onCargadores)}>
+              <PlugZap size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <span><span className="block">Completar cargadores</span><span className="block text-xs text-brand-gray">Pasa a su casilla los que están en Observaciones</span></span>
             </button>
             <button role="menuitem" type="button" className={item} onClick={elegir(onReport)}>
               <FileSpreadsheet size={15} className="text-brand-slate mt-0.5 flex-shrink-0" aria-hidden="true" />

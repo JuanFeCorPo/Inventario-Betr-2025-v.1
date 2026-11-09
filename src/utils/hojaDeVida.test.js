@@ -104,3 +104,19 @@ describe('datosHojaEquipo (F-MAN-03)', () => {
     expect(html).toContain('#ED7D31');
   });
 });
+
+describe('cargador del celular', () => {
+  const celular = { id: 'k', categoria: 'Smartphones', numeroInventario: 'BM-INV-0207', nombre: 'Celular Huawei', cargador: 'BM-INV-0226', estado: 'En Uso' };
+  it('F-MAN-02: sale junto al celular en su casilla', () => {
+    const principal = { id: 'p', categoria: 'Laptops', numeroInventario: 'BM-INV-0001', nombre: 'MacBook', cargador: 'BM-INV-0002', estado: 'En Uso' };
+    const d = datosHojaPuesto({ puesto: { nombre: 'Puesto', personas: [] }, equipos: [principal, celular], principal, historial: [], items: [] });
+    expect(d.componentes.celular[0].texto).toBe('BM-INV-0207 - Celular Huawei / Cargador - BM-INV-0226');
+    // el del portátil sigue en su casilla "Fuente" y no se repite en la celda del computador
+    expect(d.hardware.fuente).toBe('Cargador BM-INV-0002');
+    expect(d.componentes.principal[0].texto).toBe('BM-INV-0001 - MacBook');
+  });
+  it('F-MAN-03: el cargador queda en "Adicionales o accesorios"', () => {
+    const d = datosHojaEquipo({ ...celular, accesorios: 'Funda' }, []);
+    expect(d.identificacion.accesorios).toBe('Funda, Cargador BM-INV-0226');
+  });
+});
