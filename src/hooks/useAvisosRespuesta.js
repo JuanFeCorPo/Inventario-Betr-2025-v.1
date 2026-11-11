@@ -43,7 +43,7 @@ const useAvisosRespuesta = ({ nuevas, cargando, titulo, onAbrir, textoPestana = 
       try {
         const aviso = armarAviso ? armarAviso(t) : { titulo: 'T.I. te respondió', cuerpo: `${titulo(t)} · ${lineaParaColaborador(t)}` };
         const n = new Notification(aviso.titulo, {
-          body: aviso.cuerpo, tag: `ticket-${t.id}`, icon: '/pwa-192x192.png', requireInteraction: !!aviso.urgente,
+          body: aviso.cuerpo, tag: `ticket-${t.id}`, icon: '/icono-192-v2.png', requireInteraction: !!aviso.urgente,
         });
         n.onclick = () => { window.focus(); abrir.current?.(t.id); n.close(); };
       } catch { /* el navegador no dejó crearla */ }
