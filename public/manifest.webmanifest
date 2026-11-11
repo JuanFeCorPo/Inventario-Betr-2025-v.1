@@ -3,8 +3,8 @@
   "short_name": "BM Tech",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f7a3d",
-  "theme_color": "#0f7a3d",
+  "background_color": "#1C2B35",
+  "theme_color": "#1C2B35",
   "icons": [
     {
       "src": "/pwa-192x192.png",

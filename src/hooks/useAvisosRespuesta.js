@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────
-//  Avisos de "T.I. te respondió" mientras la app está abierta (sin servidor):
+//  Avisos mientras la app está abierta (sin servidor), para los dos lados:
+//  - Colaborador: "T.I. te respondió" (textos por defecto).
+//  - T.I.: ticket nuevo o respuesta del colaborador (ver textoPestana y armarAviso).
 //  - el título de la pestaña lleva el número: "(1) T.I. te respondió · …"
-//  - si la persona aceptó, sale una notificación del navegador cuando llega una
-//    respuesta nueva y no está mirando la pestaña.
+//  - si la persona aceptó, sale una notificación del navegador cuando llega algo
+//    nuevo y no está mirando la pestaña.
 //  No avisa con la app cerrada: para eso hace falta un servidor (plan Blaze).
 //  Las respuestas que ya estaban sin leer al abrir no disparan notificación
 //  (ya se ven en el aviso de arriba).
@@ -14,7 +16,7 @@ import { firmaRespuesta, tituloPestana, lineaParaColaborador } from '../utils/ti
 const soportado = () => typeof window !== 'undefined' && 'Notification' in window;
 const leerPermiso = () => (soportado() ? Notification.permission : 'no-soportado');
 
-const useAvisosRespuesta = ({ nuevas, cargando, titulo, onAbrir }) => {
+const useAvisosRespuesta = ({ nuevas, cargando, titulo, onAbrir, textoPestana = tituloPestana, armarAviso }) => {
   const [permiso, setPermiso] = useState(leerPermiso);
   const base = useRef(null);
   const conocidas = useRef(null); // firmas ya vistas; null hasta que cargan los tickets
@@ -25,9 +27,9 @@ const useAvisosRespuesta = ({ nuevas, cargando, titulo, onAbrir }) => {
   const cuantas = nuevas.length;
   useEffect(() => {
     if (base.current === null) base.current = document.title;
-    document.title = tituloPestana(base.current, cuantas);
+    document.title = textoPestana(base.current, cuantas);
     return () => { document.title = base.current; };
-  }, [cuantas]);
+  }, [cuantas, textoPestana]);
 
   // Notificación del navegador para respuestas que llegan con la app abierta
   useEffect(() => {
@@ -39,13 +41,14 @@ const useAvisosRespuesta = ({ nuevas, cargando, titulo, onAbrir }) => {
       conocidas.current.add(firma);
       if (permiso !== 'granted' || document.hasFocus()) continue;
       try {
-        const n = new Notification('T.I. te respondió', {
-          body: `${titulo(t)} · ${lineaParaColaborador(t)}`, tag: `ticket-${t.id}`, icon: '/pwa-192x192.png',
+        const aviso = armarAviso ? armarAviso(t) : { titulo: 'T.I. te respondió', cuerpo: `${titulo(t)} · ${lineaParaColaborador(t)}` };
+        const n = new Notification(aviso.titulo, {
+          body: aviso.cuerpo, tag: `ticket-${t.id}`, icon: '/pwa-192x192.png', requireInteraction: !!aviso.urgente,
         });
         n.onclick = () => { window.focus(); abrir.current?.(t.id); n.close(); };
       } catch { /* el navegador no dejó crearla */ }
     }
-  }, [nuevas, cargando, permiso, titulo]);
+  }, [nuevas, cargando, permiso, titulo, armarAviso]);
 
   const pedirPermiso = useCallback(async () => {
     if (!soportado()) return 'no-soportado';

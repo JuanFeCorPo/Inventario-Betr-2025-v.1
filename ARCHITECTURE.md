@@ -30,7 +30,7 @@ No hay servidor propio, API REST, ni Cloud Functions. Toda la lógica de negocio
 
 ```
 src/
-├── App.jsx                  # Enrutador raíz: auth, selección de pantalla, control de inactividad
+├── App.jsx                  # Enrutador raíz: auth y selección de pantalla
 ├── main.jsx                 # Punto de entrada (ReactDOM.createRoot)
 ├── config/
 │   ├── firebase.js          # Init de Firebase + rutas de colecciones Firestore
@@ -52,15 +52,13 @@ src/
 │   ├── useInventory.js        # CRUD de equipos + historial (el hook más grande)
 │   ├── useEquipoHistorial.js  # onSnapshot de la subcolección historial de un equipo
 │   ├── useEncargados.js       # Lista de personas a cargo (autocompletado)
-│   ├── useDismissedAlerts.js  # Alertas descartadas (compartidas entre usuarios)
-│   └── useIdleTimeout.js      # Cierre de sesión por inactividad
+│   └── useDismissedAlerts.js  # Alertas descartadas (compartidas entre usuarios)
 └── utils/                    # Lógica pura, sin React ni Firebase — todo testeado con Vitest
     ├── alerts.js               # Reglas de alertas del inventario
     ├── dismissedAlerts.js      # Cuándo reaparece una alerta descartada (15 días)
     ├── maintenance.js          # Cálculo de mantenimiento preventivo
     ├── duplicates.js           # Detección de serial/Nº inventario repetidos
     ├── loginLockout.js         # Bloqueo de login por intentos fallidos
-    ├── idle.js                 # Máquina de estados de inactividad (pura, testeable)
     ├── excel.js                # Import/export de Excel + sanitización anti-inyección
     └── report.js                # Armado del reporte por periodo (collectionGroup)
 ```
@@ -194,7 +192,7 @@ Export de inventario completo, historial de un equipo, o reporte por periodo (`u
 - **Autorización de dos niveles:** estar autenticado en Firebase no basta — además debe existir un doc en `users/{uid}` con `active: true`. Roles: `Administrador` (todo), `Lector` (solo lectura + crear equipos) y `Colaborador` (cuenta de Google de la empresa; **no ve el inventario**: las reglas usan `isActiveStaff()` = Administrador o Lector para todo `artifacts/…`, historial y alertas). El Colaborador solo ve `ColaboradorScreen`, que será la puerta de "Mi puesto", reportes y solicitudes.
 - **Login con Google:** `signInWithPopup` con `hd: betrmedia.com` (solo sugiere el dominio; el control real es `accessForUnregistered` en `utils/roles.js` y las reglas). El bloqueo por intentos fallidos aplica solo a correo/contraseña.
 - **Bloqueo de login** (`utils/loginLockout.js`): 3 intentos fallidos → bloqueo de 1 hora, guardado en Firestore (`loginAttempts/{email}`, doc ID = correo normalizado) para que sea real y no se evada borrando el caché del navegador. El mensaje de error es siempre el mismo ("Email o contraseña incorrectos") sin importar la causa (contraseña mala, correo inexistente, cuenta bloqueada) — no revela información al atacante.
-- **Cierre de sesión por inactividad** (`utils/idle.js` + `useIdleTimeout.js`): 8 horas (`IDLE_TIME_MS`), con aviso 40 s antes del cierre. Implementado por comparación de timestamps (no `setTimeout` puro), porque los navegadores congelan los timers de pestañas en segundo plano — justo cuando el usuario se ausenta. Vive en `App.jsx` (no en una pantalla puntual), así que cubre toda la app.
+- **Sesión persistente** (`App.jsx`): el inicio de sesión usa `browserLocalPersistence`, así que sobrevive a recargar la página, cerrar la pestaña y reiniciar el navegador, y no hay cierre por inactividad: T.I. deja la app abierta todo el día para ver los tickets. La sesión termina solo con "Cerrar sesión" (o si T.I. desactiva el usuario). Antes: sesión de pestaña (`browserSessionPersistence`) y cierre a las 8 h sin actividad.
 
 ---
 

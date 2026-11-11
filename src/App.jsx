@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
-  signOut, setPersistence, browserSessionPersistence, sendPasswordResetEmail,
+  signOut, setPersistence, browserLocalPersistence, sendPasswordResetEmail,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 import { firebaseConfig, configError, initFirebase } from './config/firebase';
 import { isLoginLocked, recordFailedLogin, clearLoginAttempts } from './utils/loginLockout';
-import { IDLE_TIME_MS, IDLE_WARNING_MS } from './config/constants';
 import { COMPANY_DOMAIN, accessForUnregistered, isCompanyEmail, isGoogleUser } from './utils/roles';
-import useIdleTimeout     from './hooks/useIdleTimeout';
-import IdleModal          from './components/modals/IdleModal';
 import LoginScreen        from './screens/LoginScreen';
 import ColaboradorScreen  from './screens/ColaboradorScreen';
 import StaffApp           from './screens/StaffApp';
@@ -123,7 +120,7 @@ export default function App() {
         if (ENTRADA_DIRECTA && !intentoReciente()) {
           marcarIntento();
           try {
-            await setPersistence(auth, browserSessionPersistence);
+            await setPersistence(auth, browserLocalPersistence);
             await signInWithRedirect(auth, proveedorGoogle(ENTRADA_DIRECTA));
             return; // la página se va a Google; el cargador sigue visible
           } catch (e) {
@@ -153,7 +150,7 @@ export default function App() {
       throw err;
     }
 
-    await setPersistence(auth, browserSessionPersistence);
+    await setPersistence(auth, browserLocalPersistence);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       await clearLoginAttempts(db, email);
@@ -175,7 +172,7 @@ export default function App() {
     if (!auth) throw new Error('Firebase auth no está listo.');
     setAuthError(null);
     setAuthNotice('');
-    await setPersistence(auth, browserSessionPersistence);
+    await setPersistence(auth, browserLocalPersistence);
     // Si vino de BETR PC, el botón también sugiere esa cuenta
     const provider = proveedorGoogle(ENTRADA_DIRECTA);
     const sinVentanas = window.matchMedia?.('(display-mode: standalone)').matches
@@ -212,17 +209,8 @@ export default function App() {
     setUser(prev => ({ ...prev, nombre }));
   };
 
-  // Al cerrar por inactividad, el login explica por qué (antes la pantalla cambiaba sin decir nada)
-  const handleIdleLogout = () => {
-    setAuthNotice('Tu sesión se cerró por inactividad. Inicia sesión de nuevo para continuar.');
-    handleLogout();
-  };
-
-  // El control de inactividad vive aquí y no en el dashboard: antes, al entrar
-  // a Usuarios o Mantenimientos el temporizador se desmontaba con la pantalla
-  // y el aviso no salía. Aquí aplica a todas por igual.
-  const { expired: sessionExpired, countdown: idleCountdown } =
-    useIdleTimeout(handleIdleLogout, user, IDLE_TIME_MS, IDLE_WARNING_MS);
+  // La sesión no se cierra sola: ni al recargar la página ni por inactividad (T.I. necesita la app
+  // abierta todo el día para ver los tickets). Se cierra solo con "Cerrar sesión".
 
   if (loading) {
     return (
@@ -243,7 +231,6 @@ export default function App() {
 
   return (
     <>
-      {sessionExpired && <IdleModal countdown={idleCountdown} />}
       {screenEl}
     </>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { codigoTicket, tituloTicket, ordenarTickets, pendientesTI, haceCuanto, validarTicket, estaAbierto, quienAtiende, lineaParaColaborador, ordenarParaColaborador, firmaRespuesta, tituloPestana } from './tickets';
+import { codigoTicket, tituloTicket, ordenarTickets, pendientesTI, haceCuanto, validarTicket, estaAbierto, quienAtiende, lineaParaColaborador, ordenarParaColaborador, firmaRespuesta, tituloPestana, tituloPestanaTI, avisoParaTI } from './tickets';
 
 const ts = (ms) => ({ toMillis: () => ms });
 
@@ -83,5 +83,24 @@ describe('avisos con la app abierta', () => {
   it('título de la pestaña con el número de respuestas', () => {
     expect(tituloPestana('BETR MEDIA TECH', 0)).toBe('BETR MEDIA TECH');
     expect(tituloPestana('BETR MEDIA TECH', 2)).toBe('(2) T.I. te respondió · BETR MEDIA TECH');
+  });
+});
+
+describe('avisos para T.I.', () => {
+  const base = { id: 't', creadoPor: { nombre: 'Dayanna Guerrero', email: 'dayanna@betrmedia.com' }, categoria: 'internet', urgencia: 'normal', estado: 'recibido', mensajes: [] };
+  it('título de la pestaña con los pendientes', () => {
+    expect(tituloPestanaTI('BETR MEDIA TECH', 0)).toBe('BETR MEDIA TECH');
+    expect(tituloPestanaTI('BETR MEDIA TECH', 3)).toBe('(3) BETR MEDIA TECH');
+  });
+  it('ticket nuevo: quién y qué; si no puede trabajar, urgente', () => {
+    expect(avisoParaTI(base)).toEqual({ titulo: 'Nuevo ticket', cuerpo: 'Dayanna · Internet o red', urgente: false });
+    expect(avisoParaTI({ ...base, urgencia: 'bloquea' })).toMatchObject({ titulo: 'Urgente: Dayanna no puede trabajar', urgente: true });
+  });
+  it('respuesta del colaborador: dice quién respondió y lo que escribió', () => {
+    const t = { ...base, estado: 'en_proceso', mensajes: [{ autor: 'ti', texto: 'hola' }, { autor: 'colaborador', texto: '  ya   probé  reiniciar ' }] };
+    expect(avisoParaTI(t)).toEqual({ titulo: 'Dayanna respondió', cuerpo: 'Internet o red: ya probé reiniciar', urgente: false });
+  });
+  it('sin nombre usa lo de antes de la @ del correo', () => {
+    expect(avisoParaTI({ ...base, creadoPor: { nombre: '', email: 'carlos@betrmedia.com' } }).cuerpo).toBe('carlos · Internet o red');
   });
 });

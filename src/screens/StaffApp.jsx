@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import AppShell from '../components/shell/AppShell';
 import useResumenTI from '../hooks/useResumenTI';
+import useAvisosRespuesta from '../hooks/useAvisosRespuesta';
+import { tituloPestanaTI, avisoParaTI } from '../utils/tickets';
 import InventoryDashboard from './InventoryDashboard';
 import UsersScreen from './UsersScreen';
 import MaintenanceScreen from './MaintenanceScreen';
@@ -22,6 +24,13 @@ const StaffApp = ({ db, user, onLogout, onGuardarNombre }) => {
     window.scrollTo(0, 0);
   };
 
+  // Avisos de ticket nuevo o respuesta, con la app abierta: título de la pestaña y notificación del navegador
+  const avisos = useAvisosRespuesta({
+    nuevas: resumen.ticketsPendientes, cargando: resumen.cargandoTickets,
+    textoPestana: tituloPestanaTI, armarAviso: avisoParaTI,
+    onAbrir: (id) => onNavigate('solicitudes', { ticketId: id }),
+  });
+
   const { screen, params } = nav;
   let contenido;
   if (screen === 'users' && user.role === 'Administrador') contenido = <UsersScreen db={db} currentUser={user} />;
@@ -31,7 +40,7 @@ const StaffApp = ({ db, user, onLogout, onGuardarNombre }) => {
   else contenido = <InventoryDashboard db={db} user={user} onNavigate={onNavigate} filtro={params.filtro} filtroNonce={params.n} />;
 
   return (
-    <AppShell user={user} screen={screen} onNavigate={onNavigate} onLogout={onLogout} onGuardarNombre={onGuardarNombre} resumen={resumen}>
+    <AppShell user={user} screen={screen} onNavigate={onNavigate} onLogout={onLogout} onGuardarNombre={onGuardarNombre} resumen={resumen} avisos={avisos}>
       {contenido}
     </AppShell>
   );

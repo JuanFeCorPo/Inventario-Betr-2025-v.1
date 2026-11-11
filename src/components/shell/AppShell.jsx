@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────
 
 import { useState } from 'react';
-import { Home, MessageSquareWarning, Monitor, Wrench, LogOut, Users, ChevronDown, ShieldCheck, Eye, PencilLine } from 'lucide-react';
+import { Home, MessageSquareWarning, Monitor, Wrench, LogOut, Users, ChevronDown, ShieldCheck, Eye, PencilLine, BellRing } from 'lucide-react';
 import { LOGO_URL } from '../../config/constants';
 import { usePopover } from '../../hooks/usePopover';
 import AlertsBell from '../AlertsBell';
@@ -123,7 +123,8 @@ const MenuUsuario = ({ user, onUsers, onLogout, onGuardarNombre }) => {
   );
 };
 
-const AppShell = ({ user, screen, onNavigate, onLogout, onGuardarNombre, resumen, children }) => {
+// `avisos`: { permiso, pedirPermiso } de useAvisosRespuesta; el botón sale mientras la persona no haya decidido.
+const AppShell = ({ user, screen, onNavigate, onLogout, onGuardarNombre, resumen, avisos, children }) => {
   const actual = PESTANAS.some(p => p.key === screen) ? screen : null;
   const conteo = (p) => (p.conteo ? resumen.conteos[p.conteo] ?? 0 : 0);
   const irAlAviso = (alerta) => {
@@ -167,6 +168,13 @@ const AppShell = ({ user, screen, onNavigate, onLogout, onGuardarNombre, resumen
           </nav>
 
           <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+            {avisos?.permiso === 'default' && (
+              <button type="button" onClick={avisos.pedirPermiso} title="Activar los avisos del navegador: te avisan al llegar un ticket nuevo o una respuesta, con la app abierta"
+                className={`h-11 px-3 flex items-center gap-2 rounded-xl text-sm font-medium transition ${VIDRIO}`}>
+                <BellRing size={16} className="text-brand-amber" aria-hidden="true" /><span className="hidden lg:inline">Activar avisos</span>
+                <span className="sr-only lg:hidden">Activar avisos de tickets nuevos</span>
+              </button>
+            )}
             <AlertsBell alerts={resumen.alerts} onGoTo={irAlAviso} onDismiss={resumen.dismissAlert} botonClassName={`h-11 w-11 ${VIDRIO}`} />
             <MenuUsuario user={user} onUsers={() => onNavigate('users')} onLogout={onLogout} onGuardarNombre={onGuardarNombre} />
           </div>

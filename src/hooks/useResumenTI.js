@@ -18,7 +18,7 @@ import { equiposDelPuesto, resumenPuesto } from '../utils/puestos';
 const useResumenTI = (db, user) => {
   const { items } = useInventory(db, user);
   const { puestos } = usePuestos(db, user);
-  const tickets = useTicketsPendientes(db);
+  const { tickets, loading: cargandoTickets } = useTicketsPendientes(db);
   const { dismissedMap, dismissAlert } = useDismissedAlerts(db, user);
 
   return useMemo(() => {
@@ -34,10 +34,10 @@ const useResumenTI = (db, user) => {
     }] : [];
     const alerts = [...avisoTickets, ...computeAlerts(items).filter(a => !isAlertDismissed(dismissedMap, a.id))];
     return {
-      alerts, dismissAlert,
+      alerts, dismissAlert, ticketsPendientes: solicitudes, cargandoTickets,
       conteos: { solicitudes: solicitudes.length, puestos: puestosPendientes, mantenimientos: countOverdueMaintenance(items) },
     };
-  }, [items, puestos, tickets, dismissedMap, dismissAlert]);
+  }, [items, puestos, tickets, cargandoTickets, dismissedMap, dismissAlert]);
 };
 
 export default useResumenTI;

@@ -116,15 +116,17 @@ export const useTicketsTI = (db, user) => {
   return { tickets, loading, marcarVisto, tomar, responder, resolver, reabrir };
 };
 
-// Solo el conteo de pendientes (para el botón del encabezado del inventario).
+// Los tickets abiertos, para los conteos y avisos del encabezado. `loading` evita tomar la
+// cola que ya existía al abrir la app como si fueran tickets nuevos.
 export const useTicketsPendientes = (db, activo = true) => {
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (!db || !activo) return undefined;
     return onSnapshot(query(collection(db, TICKETS_PATH), where('estado', 'in', ['recibido', 'en_proceso'])),
-      snap => setTickets(conId(snap)), () => setTickets([]));
+      snap => { setTickets(conId(snap)); setLoading(false); }, () => { setTickets([]); setLoading(false); });
   }, [db, activo]);
-  return tickets;
+  return { tickets, loading };
 };
 
 // ── Lo que ve el colaborador ──────────────────

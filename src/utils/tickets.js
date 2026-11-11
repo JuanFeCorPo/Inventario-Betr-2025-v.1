@@ -122,3 +122,22 @@ export const firmaRespuesta = (t) => `${t.id}|${(t.mensajes ?? []).length}|${t.e
 
 // "(2) T.I. te respondió · BETR MEDIA TECH" en la pestaña; sin respuestas, el título normal.
 export const tituloPestana = (base, nuevas) => (nuevas > 0 ? `(${nuevas}) T.I. te respondió · ${base}` : base);
+
+// Lado de T.I.: "(2) BETR MEDIA TECH" y la notificación de un ticket nuevo o de una respuesta.
+export const tituloPestanaTI = (base, pendientes) => (pendientes > 0 ? `(${pendientes}) ${base}` : base);
+
+const primerNombreDe = (t) => {
+  const n = String(t?.creadoPor?.nombre ?? '').trim().split(/\s+/)[0];
+  return n || String(t?.creadoPor?.email ?? '').split('@')[0] || 'Alguien';
+};
+export const avisoParaTI = (t) => {
+  const quien = primerNombreDe(t);
+  const ultimo = (t.mensajes ?? []).at(-1);
+  if (ultimo && ultimo.autor === 'colaborador') {
+    const texto = String(ultimo.texto ?? '').replace(/\s+/g, ' ').trim();
+    return { titulo: `${quien} respondió`, cuerpo: `${tituloTicket(t)}${texto ? `: ${texto.slice(0, 100)}` : ''}`, urgente: t.urgencia === 'bloquea' };
+  }
+  return t.urgencia === 'bloquea'
+    ? { titulo: `Urgente: ${quien} no puede trabajar`, cuerpo: tituloTicket(t), urgente: true }
+    : { titulo: 'Nuevo ticket', cuerpo: `${quien} · ${tituloTicket(t)}`, urgente: false };
+};
